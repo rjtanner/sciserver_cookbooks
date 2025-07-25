@@ -27,7 +27,7 @@ jupyter:
 <hr style="border: 2px solid #fadbac" />
 <!-- #endregion -->
 
-## Introduction
+## 1. Introduction
 This tutorial is based on Chapter 12 from the The [The XMM-Newton ABC Guide](https://heasarc.gsfc.nasa.gov/docs/xmm/abc/ "ABC Guide") prepared by the NASA/GSFC XMM-Newton Guest Observer Facility. This notebook assumes you are at least minimally familiar with pySAS on SciServer (see the [Long pySAS Introduction](./analysis-xmm-long-intro.md "Long pySAS Intro")). 
 
 #### SAS Tasks to be Used
@@ -59,7 +59,7 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
 </div>
 
 
-## 12 An OM Data Processing and Analysis Primer
+## 2. An OM Data Processing and Analysis Primer
 
 
 The OM can operate in Imaging, Fast, and Grism mode. Each of these modes has dedicated commands to reprocess the data: omichain, omfchain, and omgchain. These are metatasks that each call several procedures that are used to prepare the data for processing, make and apply flatfield images, and detect sources. The tasks omichain and omfchain also calculate the instrumental magnitudes of sources, find the position of the sources (in equatorial coordinates), and produce a sky image; omgchain produces a spectrum. If you run these chains, it is helpful to inspect the sas_log file to get a detailed list of the performed tasks. These chains rely on filters specified by the user; if no arguments are given, they run on all the files present in the ODF directory. Due to the long file names and the large number of input parameters, users are urged to simply use the chains and not run the chains' individual tasks one at a time.
@@ -67,7 +67,7 @@ The OM can operate in Imaging, Fast, and Grism mode. Each of these modes has ded
 Most OM data are obtained in Imaging mode. If they were obtained in the Fast mode, there will be an additional event list file corresponding to the Fast window (*FAE.FIT). Reprocessing of data taken in Fast mode using the command line and SAS GUI is discussed in §12.3. Reprocessing OM Grism data is discussed in §12.4.
 
 
-## 12.1 OM Artifacts and General Information
+## 3. OM Artifacts and General Information
 
 
 Before proceeding with this notebook, it is appropriate to discuss the artifacts that often affect OM images. These artifacts can affect the accuracy of a measurement by e.g., increasing the background level.
@@ -86,10 +86,10 @@ Further, artifacts also can contaminate grism data. Due to this mode's complexit
 
 
 
-## 12.2 Imaging mode
+## 4. Imaging mode
 
 
-#### 12.2.1 Rerunning the Pipeline
+### 4.1 Rerunning the Pipeline
 
 ```python
 # pySAS imports
@@ -123,8 +123,8 @@ usr = auth.getKeystoneUserWithToken(auth.getToken()).userName
 
 data_dir = os.path.join('/home/idies/workspace/Temporary/',usr,'scratch/xmm_data/')
 
-odf = pysas.odfcontrol.ODFobject(obsid)
-odf.basic_setup(data_dir=data_dir,repo='sciserver',overwrite=False,
+odf = pysas.odfcontrol.ODFobject(obsid,data_dir=data_dir)
+odf.basic_setup(repo='sciserver',overwrite=False,
                 run_epproc=False,run_emproc=False,run_rgsproc=False)
 ```
 
@@ -233,7 +233,7 @@ omichain:-  1)      P0123700101OMS004TSTRTS000.FIT      P0123700101OMS004TSHPLT0
 ```
 
 
-#### 12.2.2 Verifying the output
+### 4.2 Verifying the output
 
 
 Now we will check for those artifacts as described in Section 12.1. While these artifacts largely have only aesthetic effects, they can also affect source brightness measurements, since they increase the background. Hence, we strongly recommend users to verify the consistency of the data before continuing analysis. There are a few different ways to do this, described in [the ABC Guide](https://heasarc.gsfc.nasa.gov/docs/xmm/abc/node14.html#SECTION001422000000000000000 "the ABC Guide"). As an example in this notebook, we will visually assess the extracted source list.
@@ -260,10 +260,10 @@ If the region files match up well with the sources seen in the image, the data h
 Now we will move onto the other modes of OM data.
 
 
-## 12.3 Fast Mode
+## 5. Fast Mode
 
 
-#### 12.3.1 Rerunning the Pipeline
+### 5.1 Rerunning the Pipeline
 
 
 The repipelining task for OM data taken in fast mode is [`omfchain`](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/omfchain/index.html "omfchain"). It produces images of the detected sources, extracts events related to the sources and the background, and extracts the corresponding light curves. At present, unlike `omichain`, `omfchain` does not allow for keywords to specify filters or exposures; calling this task will process all fast mode data.
@@ -296,7 +296,7 @@ w('omfchain', inargs).run()
 Note that we did not call any particular parameters for this example. For a complete list of parameter options, see the [documentation](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/omfchain/node9.html "documentation").
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
-#### 12.3.2 Verifying the Output
+### 5.2 Verifying the Output
 <!-- #endregion -->
 
 A good first step in checking the output is to examine the light curve plot for both the source and background, making sure they are reasonable: no isolated, unusually high (or low) values, and no frequent drop-outs. Users should also check the image with JS9 in the Fast mode window to see if the source is near an edge. If it is, it's a good idea to examine the light curves from diffent exposures to verify that they are consistent from exposure to exposure (while keeping in mind any intrinsic source variability). If the image is blurred or unusual in any way, users should check the tracking history file to verify the tracking was reliable.
@@ -329,10 +329,10 @@ plt.ylabel('counts/s')
 The background light curve plotted above is constant because omfchain runs with the parameter `bkgfromimage=yes` by default, so that the background light curve is found by using the imaging-mode data, instead of the fast-mode window. This is preferable for even only moderately bright sources (count rate > 0.6 ct/s), as the fast-mode window is small and any background measurement that uses it will likely be contaminated with source photons. This is less of a concern if your source is faint, in which case the background can by found from data in the fast-mode window by typing: `omfchain bkgfromimage=no`
 
 
-## 12.4 Grism Analysis
+## 6. Grism Analysis
 
 
-#### 12.4.1 Rerunning the Pipeline
+### 6.1 Rerunning the Pipeline
 
 
 The repipelining task for OM data taken in grism mode is `omgchain`. It produces images of the detected sources and background, extracts source spectra and region files, and makes source lists and postscript and PDF plots. At present, unlike `omichain`, `omgchain` does not allow for keywords to specify filters or exposures; calling this task will process all grism mode data.
@@ -366,7 +366,7 @@ inargs = ['plotflux=0']
 w('omgchain', inargs).run()
 ```
 
-#### 12.4.2 Analysis
+### 6.2 Analysis
 
 
 Below we will walk through a simple grism data analysis example. The code below will find the best fit for emission lines, which can be used to derive fluxes. For a more robust error analysis, we recommend using one of several Python packages using a Markov Chain Monte Carlo (MCMC) sampler (e.g., [emcee](https://emcee.readthedocs.io/en/stable/ 'emcee')). First, we will take a look at one of the spectrum files created through the `omgchain` step.

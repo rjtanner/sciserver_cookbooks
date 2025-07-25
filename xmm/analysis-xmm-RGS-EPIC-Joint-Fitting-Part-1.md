@@ -19,16 +19,16 @@ jupyter:
 - **Description:** XMM-Newton - Spectral Fitting Introduction
 - **Level:** Advanced
 - **Data:** XMM observation of Mkn 509 (obsid=0601390201)
-- **Requirements:** Must be run using the `HEASARCv6.35` image. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
+- **Requirements:** Must be run using the `HEASARCv6.35` (or higher) image, along with pySAS version 2.0. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
 - **Credit:** Jenna Cann (March 2025)
 - **Support:** <a href="https://heasarc.gsfc.nasa.gov/docs/xmm/xmm_helpdesk.html">XMM Newton GOF Helpdesk</a>
-- **Last verified to run:** 28 March 2025, for SAS v22.1 and pySAS v1.4.8
+- **Last verified to run:** 21 July 2025, for SAS v22.1 and pySAS v2.0
 
 <hr style="border: 2px solid #fadbac" />
 <!-- #endregion -->
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
-#### Introduction
+## 1. Introduction
 This tutorial was created to guide XMM users through 
 an example analysis of RGS and EPIC spectra. This is Part 1, where we will reduce and prepare the data for analysis in Part 2. 
 #### Expected Outcome
@@ -70,7 +70,7 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
 ```python editable=true slideshow={"slide_type": ""}
 # pySAS imports
 import pysas
-from pysas.wrapper import Wrapper as w
+from pysas.sastask import MyTask
 
 # Importing Js9
 import jpyjs9
@@ -94,7 +94,7 @@ my_js9 = jpyjs9.JS9(width = 800, height = 800, side=True)
 ```
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
-### Rerun basic processing
+## 2. Rerun basic processing
 <!-- #endregion -->
 
 ```python editable=true slideshow={"slide_type": ""}
@@ -106,7 +106,7 @@ usr = auth.getKeystoneUserWithToken(auth.getToken()).userName
 
 data_dir = os.path.join('/home/idies/workspace/Temporary/',usr,'scratch/xmm_data')
 
-odf = pysas.odfcontrol.ODFobject(obsid)
+my_obs = pysas.obsid.ObsID(obsid,data_dir=data_dir)
 ```
 
 We start by reprocessing the data. As we will be jointly fitting the MOS and RGS data, we will set run_emproc and run_rgsproc to 'True' and run_epproc to 'False'.
@@ -122,16 +122,20 @@ rgsproc_args = ["orders='1 2'",
                 'withmlambdacolumn=yes',
                 'spectrumbinning=lambda']
 
-odf.basic_setup(data_dir=data_dir,overwrite=False,repo='sciserver',rerun=False,
-                run_epproc=True,run_emproc=True,run_rgsproc=True,rgsproc_args=rgsproc_args)
+my_obs.basic_setup(data_dir=data_dir,overwrite=False,repo='sciserver',rerun=False,
+                    run_epproc=False,run_emproc=True,run_rgsproc=True,rgsproc_args=rgsproc_args)
 ```
 
-As we are processing both RGS and EPIC data, the above task will take several minutes. We will also follow the standard process for filtering EPIC data and extracting spectra from chapter 6 of the ABC guide.
+## 3. Apply Filters
 
-```python
-mos1 = odf.files['M1evt_list'][0]
-mos2 = odf.files['M2evt_list'][0]
-pn = odf.files['PNevt_list'][0]
+<!-- #region editable=true slideshow={"slide_type": ""} -->
+As we are processing both RGS and EPIC data, the above task will take several minutes. We will also follow the standard process for filtering EPIC data and extracting spectra from chapter 6 of the ABC guide.
+<!-- #endregion -->
+
+```python editable=true slideshow={"slide_type": ""}
+mos1 = my_obs.files['M1evt_list'][0]
+mos2 = my_obs.files['M2evt_list'][0]
+pn = my_obs.files['PNevt_list'][0]
 
 print(mos1)
 print(mos2)
@@ -152,7 +156,7 @@ inargs = ['table={0}'.format(mos1),
           'updateexposure=yes', 
           'filterexposure=yes']
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 
 inargs = ['table={0}'.format(mos2), 
           'withfilteredset=yes', 
@@ -163,7 +167,7 @@ inargs = ['table={0}'.format(mos2),
           'updateexposure=yes', 
           'filterexposure=yes']
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 
 inargs = ['table={0}'.format(pn), 
           'withfilteredset=yes', 
@@ -174,12 +178,12 @@ inargs = ['table={0}'.format(pn),
           'updateexposure=yes', 
           'filterexposure=yes']
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 ```
 
 Functions for generating images and light curves.
 
-```python
+```python editable=true slideshow={"slide_type": ""}
 def make_fits_image(event_list_file, image_file='image.fits'):
     
     inargs = ['table={0}'.format(event_list_file), 
@@ -191,7 +195,7 @@ def make_fits_image(event_list_file, image_file='image.fits'):
               'ximagesize=600', 
               'yimagesize=600']
 
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 
     with fits.open(image_file) as hdu:
         my_js9.SetFITS(hdu)
@@ -211,7 +215,7 @@ def plot_light_curve(event_list_file, filtered_event_list, light_curve_file, ccd
               'updateexposure=yes', 
               'filterexposure=yes']
 
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 
     inargs = ['table={0}'.format(filtered_event_list), 
               'withrateset=yes', 
@@ -221,7 +225,7 @@ def plot_light_curve(event_list_file, filtered_event_list, light_curve_file, ccd
               'timebinsize=100', 
               'makeratecolumn=yes']
 
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 
     ts = Table.read(light_curve_file,hdu=1)
     plt.plot(ts['TIME'],ts['RATE'])
@@ -229,6 +233,9 @@ def plot_light_curve(event_list_file, filtered_event_list, light_curve_file, ccd
     plt.ylabel('Count Rate (ct/s)')
     plt.show()
 ```
+
+## 4. Check Light Curves
+
 
 This particular observation is not contaminated with flaring, but as best practice we check the light curves to confirm that everything looks good. The light curves for a constant source like the one we are analyzing should remain fairly constant (with some noise of course). For your own sources you should of course check the light curves to check for contamination from flaring.
 
@@ -245,6 +252,8 @@ light_curve_file_pn='pn_ltcrv.fits'
 filtered_gtr10_pn = 'pn_gtr10.fits'
 plot_light_curve(filtered_event_list_pn, filtered_gtr10_pn, light_curve_file_pn, 'EP')
 ```
+
+## 5. Make Spectra
 
 ```python
 def make_spectrum(filtered_event_list, filtered_source, filtered_bkg, source_spectrum_file, bkg_spectrum_file, source_coords, bkg_coords, specchannelmax):
@@ -264,7 +273,7 @@ def make_spectrum(filtered_event_list, filtered_source, filtered_bkg, source_spe
               'specchannelmin'  : '0',
               'specchannelmax'  : '{:s}'.format(specchannelmax)}
 
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 
     inargs = {}
     inargs = {'table'           : filtered_event_list,
@@ -281,7 +290,7 @@ def make_spectrum(filtered_event_list, filtered_source, filtered_bkg, source_spe
               'specchannelmin'  : '0',
               'specchannelmax'  : '{:s}'.format(specchannelmax)}
 
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
     
     return source_spectrum_file, bkg_spectrum_file
 ```
@@ -328,7 +337,7 @@ def make_rmf_arf(rmf,arf,source_spectrum_file,event_file):
     inargs = {'rmfset'      : rmf,
               'spectrumset' : source_spectrum_file}
 
-    w('rmfgen', inargs).run()
+    MyTask('rmfgen', inargs).run()
 
     inargs = {}
     inargs = {'arfset'         : arf,
@@ -339,7 +348,7 @@ def make_rmf_arf(rmf,arf,source_spectrum_file,event_file):
               'badpixlocation' : event_file,
               'setbackscale'   : 'yes'}
 
-    w('arfgen', inargs).run()
+    MyTask('arfgen', inargs).run()
     
     return rmf, arf
 ```
@@ -371,7 +380,7 @@ inargs = {'spectrumset' : source_spectrum_file_mos1,
           'mincounts'   : '25',
           'oversample'  : '3'}
 
-w('specgroup', inargs).run()
+MyTask('specgroup', inargs).run()
 
 inargs = {}
 inargs = {'spectrumset' : source_spectrum_file_mos2,
@@ -382,7 +391,7 @@ inargs = {'spectrumset' : source_spectrum_file_mos2,
           'mincounts'   : '25',
           'oversample'  : '3'}
 
-w('specgroup', inargs).run()
+MyTask('specgroup', inargs).run()
 ```
 
 Now we have processed the relevant data and are ready to move forward with Part 2.

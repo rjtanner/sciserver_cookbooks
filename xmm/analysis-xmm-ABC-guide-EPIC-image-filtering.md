@@ -7,28 +7,28 @@ jupyter:
       format_version: '1.3'
       jupytext_version: 1.16.0
   kernelspec:
-    display_name: (xmmsas)
+    display_name: (heasoft)
     language: python
-    name: conda-env-xmmsas-py
+    name: conda-env-heasoft-py
 ---
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
-# ABC Guide for XMM-Newton -- Part 1
+# ABC Guide for XMM-Newton -- EPIC Image Creation and Basic Filtering
 <hr style="border: 2px solid #fadbac" />
 
-- **Description:** XMM-Newton ABC Guide, Chapter 6, Part 1.
+- **Description:** XMM-Newton ABC Guide, EPIC Image Creation and Basic Filtering.
 - **Level:** Beginner
 - **Data:** XMM observation of the Lockman Hole (obsid=0123700101)
-- **Requirements:** Must be run using the `HEASARCv6.35` image. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
+- **Requirements:** Must be run using the `HEASARCv6.35` (or higher) image, along with pySAS version 2.0. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
 - **Credit:** Ryan Tanner (April 2024)
 - **Support:** <a href="https://heasarc.gsfc.nasa.gov/docs/xmm/xmm_helpdesk.html">XMM Newton GOF Helpdesk</a>
-- **Last verified to run:** 26 March 2025, for SAS v22.1 and pySAS v1.4.8
+- **Last verified to run:** 21 July 2025, for SAS v22.1 and pySAS v2.0
 
 <hr style="border: 2px solid #fadbac" />
 <!-- #endregion -->
 
-## Introduction
-This tutorial is based on Chapter 6 from the The [The XMM-Newton ABC Guide](https://heasarc.gsfc.nasa.gov/docs/xmm/abc/ "ABC Guide") prepared by the NASA/GSFC XMM-Newton Guest Observer Facility. This notebook assumes you are at least minimally familiar with pySAS on SciServer (see the [Long pySAS Introduction](./analysis-xmm-long-intro.md "Long pySAS Intro")). 
+## 1. Introduction
+This tutorial is based on Chapter 7 from [The XMM-Newton ABC Guide](https://heasarc.gsfc.nasa.gov/docs/xmm/abc/ "ABC Guide") prepared by the NASA/GSFC XMM-Newton Guest Observer Facility. This notebook assumes you are at least minimally familiar with pySAS on SciServer (see the [Long pySAS Introduction](./analysis-xmm-long-intro.md "Long pySAS Intro")). 
 
 #### SAS Tasks to be Used
 
@@ -61,12 +61,12 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
 </div>
 
 
-## 6.1 Rerun basic processing
+## 2. Rerun basic processing
 
 ```python
 # pySAS imports
 import pysas
-from pysas.wrapper import Wrapper as w
+from pysas.sastask import MyTask
 
 # Importing Js9
 import jpyjs9
@@ -83,7 +83,7 @@ from astropy.table import Table
 plt.style.use(astropy_mpl_style)
 ```
 
-```python
+```python editable=true slideshow={"slide_type": ""}
 obsid = '0123700101'
 
 # To get your user name. Or you can just put your user name in the path for your data.
@@ -92,37 +92,29 @@ usr = auth.getKeystoneUserWithToken(auth.getToken()).userName
 
 data_dir = os.path.join('/home/idies/workspace/Temporary/',usr,'scratch/xmm_data')
 
-odf = pysas.odfcontrol.ODFobject(obsid)
-odf.basic_setup(data_dir=data_dir,repo='sciserver',overwrite=False,
-                run_epproc=False,run_emproc=False,run_rgsproc=False,
-                level='PPS',filename='P0123700101M1S001MIEVLI0000.FTZ')
+my_obs = pysas.obsid.ObsID(obsid,data_dir=data_dir)
+my_obs.basic_setup(repo='sciserver',overwrite=False,
+                   run_epproc=False,run_rgsproc=False)
 ```
 
 <!-- #region -->
-For demonstration purposes we will start with the processed event list from the pipeline products (`PPS`) instead of the raw observational data files (`ODF`). You can run this notebook using the following command instead:
-
-```python
-odf.basic_setup(data_dir=data_dir,overwrite=False,repo='sciserver',rerun=False)
-```
-
-If you use the `ODFs` then running `odf.basic_setup` will recalibrate the data and run `epproc`, `emproc`, and `rgsproc` on the data. The output from those tasks will not display in the cell output, but will be written to log files found in the `obsid` work directory.
-
 <div class="alert alert-block alert-info">
-    <b>Note:</b> If you use the <tt>ODFs</tt> instead of the <tt>PPS</tt> files then running <tt>epproc</tt>, <tt>emproc</tt>, and <tt>rgsproc</tt> on this particular obsid may take several (>40) minutes. Be prepared to wait.
+    <b>Note:</b> Running <tt>emproc</tt> on this particular obsid may take several (>10) minutes. Be prepared to wait.
 </div>
 
 If the dataset has more than one exposure, a specific exposure can be accessed using the <tt>withinstexpids</tt> and <tt>instexpids</tt> parameters, e.g.:
 
 ```python
-inargs = "withinstexpids=yes instexpids='M1S001 M2S001'"
-w('emproc', inargs).run()
+inargs = {'withinstexpids' : 'yes', 
+          'instexpids'     : "'M1S001 M2S001'"}
+MyTask('emproc', inargs).run()
 ```
 
 To create an out-of-time event file for your PN data, add the parameter <tt>withoutoftime</tt> to your <tt>epproc</tt> invocation:
 
 ```python
-inargs = ["withoutoftime=yes"]
-w('epproc', inargs).run()
+inargs = {'withoutoftime' : 'yes'}
+MyTask('epproc', inargs).run()
 ```
 
 <div class="alert alert-block alert-info">
@@ -132,7 +124,7 @@ w('epproc', inargs).run()
 By default, these tasks do not keep any intermediate files they generate. <tt>Emproc</tt> and <tt>epproc</tt> designate their output event files with "*ImagingEvts.ds".
 <!-- #endregion -->
 
-## 6.2 Plot image
+## 3. Plot image
 
 
 For displaying images we are using a `ds9` clone, `JS9`. It has all the same functionality as `ds9` but it allows us to directly interface with it using Python code. The cell below  will display the `JS9` window to the side of this notebook.
@@ -163,16 +155,16 @@ The input arguments to `evselect` to create a FITS image file are:
 ```python
 def make_fits_image(event_list_file, image_file='image.fits'):
     
-    inargs = ['table={0}'.format(event_list_file), 
-              'withimageset=yes',
-              'imageset={0}'.format(image_file), 
-              'xcolumn=X', 
-              'ycolumn=Y', 
-              'imagebinning=imageSize', 
-              'ximagesize=600', 
-              'yimagesize=600']
+    inargs = {'table'        : event_list_file, 
+              'withimageset' : 'yes',
+              'imageset'     : image_file, 
+              'xcolumn'      : 'X', 
+              'ycolumn'      : 'Y', 
+              'imagebinning' : 'imageSize', 
+              'ximagesize'   : '600', 
+              'yimagesize'   : '600'}
 
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 
     with fits.open(image_file) as hdu:
         my_js9.SetFITS(hdu)
@@ -196,18 +188,23 @@ The input arguments to `evselect` to create a light curve file are:
     makeratecolumn - control to create a count rate column, otherwise a count column will be created
 
 
+<!-- #region -->
+<div class="alert alert-block alert-info">
+    <b>Note:</b>For this notebook we will be using a function named 'quick_lcplot' that is part of the 'ObsID' object for quick light curve plotting. The equivelent code is shown below:
+</div>
+
 ```python
 def plot_light_curve(event_list_file, light_curve_file='ltcrv.fits'):
                      
-    inargs = ['table={0}'.format(event_list_file), 
-              'withrateset=yes', 
-              'rateset={0}'.format(light_curve_file), 
-              'maketimecolumn=yes', 
-              'timecolumn=TIME', 
-              'timebinsize=100', 
-              'makeratecolumn=yes']
+    inargs = {'table'          : event_list_file, 
+              'withrateset'    : 'yes', 
+              'rateset'        : light_curve_file, 
+              'maketimecolumn' : 'yes', 
+              'timecolumn'     : 'TIME', 
+              'timebinsize'    : '100', 
+              'makeratecolumn' : 'yes'}
 
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 
     ts = Table.read(light_curve_file,hdu=1)
     plt.plot(ts['TIME'],ts['RATE'])
@@ -215,12 +212,13 @@ def plot_light_curve(event_list_file, light_curve_file='ltcrv.fits'):
     plt.ylabel('Count Rate (ct/s)')
     plt.show()
 ```
+<!-- #endregion -->
 
 We need to change into the work directory to run the next SAS tasks. We also get the name and path to the event list file created in §6.1.
 
 ```python
-os.chdir(odf.work_dir)
-mos1 = odf.files['PPS'][0]
+os.chdir(my_obs.work_dir)
+mos1 = my_obs.files['M1evt_list'][0]
 ```
 
 Here we plot an image of the raw data with no filters applied. The image should be very noisy.
@@ -229,7 +227,7 @@ Here we plot an image of the raw data with no filters applied. The image should 
 make_fits_image(mos1)
 ```
 
-## 6.3 Apply Standard Filter
+## 4. Apply Standard Filter
 
 
 To begin we apply a standard filter. The filtering expressions for the MOS and PN are, respectively:
@@ -262,16 +260,16 @@ The input arguments to `evselect` to apply the filter are:
 ```python
 filtered_event_list = 'mos1_filt.fits'
 
-inargs = ['table={0}'.format(mos1), 
-          'withfilteredset=yes', 
-          "expression='(PATTERN <= 12)&&(PI in [200:4000])&&#XMMEA_EM'", 
-          'filteredset={0}'.format(filtered_event_list), 
-          'filtertype=expression', 
-          'keepfilteroutput=yes', 
-          'updateexposure=yes', 
-          'filterexposure=yes']
+inargs = {'table'           : mos1, 
+          'withfilteredset' : 'yes', 
+          "expression"      : "'(PATTERN <= 12)&&(PI in [200:4000])&&#XMMEA_EM'", 
+          'filteredset'     : filtered_event_list, 
+          'filtertype'      : 'expression', 
+          'keepfilteroutput': 'yes', 
+          'updateexposure'  : 'yes', 
+          'filterexposure'  : 'yes'}
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 ```
 
 <div class="alert alert-block alert-info">
@@ -286,7 +284,7 @@ make_fits_image(filtered_event_list)
 ```
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
-## 6.4 Create Light Curve
+## 5. Create Light Curve
 <!-- #endregion -->
 
 Sometimes, it is necessary to use filters on time in addition to those mentioned above. This is because of soft proton background flaring, which can have count rates of 100 counts/sec or higher across the entire bandpass. It should be noted that the amount of flaring that needs to be removed depends in part on the object observed; a faint, extended object will be more affected than a very bright X-ray source.
@@ -295,13 +293,13 @@ To see if background flaring should be removed we plot and examine the light cur
 
 ```python
 light_curve_file='mos1_ltcrv.fits'
-plot_light_curve(filtered_event_list, light_curve_file=light_curve_file)
+my_obs.quick_lcplot(filtered_event_list,light_curve_file=light_curve_file)
 ```
 
 Taking a look at the light curve, we can see that there is a very large flare toward the end of the observation and two much smaller ones in the middle of the exposure. Examining the light curve shows us that during non-flare times, the count rate is quite low, about 1.3 ct/s, with a small increase at 7.3223e7 seconds to about 6 ct/s. We can use that to further filter the data.
 
 
-## 6.5 Applying Time or Rate Filters to the Data
+## 6. Applying Time or Rate Filters to the Data
 
 
 There are many ways to filter the data. We will demonstrate four different methods. The first three methods will create a Good Time Interval (GTI) file which can then be used as an input to the command `evselect`. This will create a new, filtered, event list.
@@ -314,7 +312,7 @@ There are many ways to filter the data. We will demonstrate four different metho
 For the last method the user explicitly inputs the time intervals to be used as an expression for the command `evselect` rather than using a separate GTI file. All of these will get the job done, so which to use is a matter of the user's preference.
 
 
-#### 6.5.1 Using `tabgtigen` to filter on `RATE`
+### 6.1 Using `tabgtigen` to filter on `RATE`
 
 
 The inputs for `tabgtigen` are:
@@ -330,23 +328,23 @@ We choose a rate $<= 6$ counts/s and filter based on that. As the input we use t
 gti_rate_file = 'gti_rate.fits'
 mos1_filt_rate = 'mos1_filt_rate.fits'
 
-inargs = ['table={0}'.format(light_curve_file), 
-          'gtiset={0}'.format(gti_rate_file),
-          'timecolumn=TIME', 
-          "expression='(RATE <= 6)'"]
+inargs = {'table'      : light_curve_file, 
+          'gtiset'     : gti_rate_file,
+          'timecolumn' : 'TIME', 
+          "expression" : "'(RATE <= 6)'"}
 
-w('tabgtigen', inargs).run()
+MyTask('tabgtigen', inargs).run()
 
-inargs = ['table={0}'.format(filtered_event_list),
-          'withfilteredset=yes', 
-          "expression='GTI({0},TIME)'".format(gti_rate_file), 
-          'filteredset={0}'.format(mos1_filt_rate),
-          'filtertype=expression', 
-          'keepfilteroutput=yes',
-          'updateexposure=yes', 
-          'filterexposure=yes']
+inargs = {'table'           : filtered_event_list,
+          'withfilteredset' : 'yes', 
+          "expression"      : "'GTI({0},TIME)'".format(gti_rate_file), 
+          'filteredset'     : mos1_filt_rate,
+          'filtertype'      : 'expression', 
+          'keepfilteroutput': 'yes',
+          'updateexposure'  : 'yes', 
+          'filterexposure'  : 'yes'}
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 ```
 
 Now we create an image from the new event list that has been filtered based on `RATE`. There should be significantly less noise and only point sources should remain. Compare this final image to the first raw, unfilted image.
@@ -358,10 +356,10 @@ make_fits_image(mos1_filt_rate, image_file='final_image1.fits')
 We can also create a new light curve from the filtered event list and compare it to the light curve from §6.4 to see what we have done.
 
 ```python
-plot_light_curve(mos1_filt_rate)
+my_obs.quick_lcplot(mos1_filt_rate)
 ```
 
-#### 6.5.2 Using `tabgtigen` to filter on `TIME`
+### 6.2 Using `tabgtigen` to filter on `TIME`
 
 
 Alternatively, we could have chosen to make a new GTI file by noting the times of the flaring in the light curve and using that as a filtering parameter. The big flare starts around 7.32276e7 s, and the smaller ones are at 7.32119e7 s and 7.32205e7 s. The expression to remove these would be `(TIME <= 73227600)&&!(TIME IN [7.32118e7:7.3212e7])&&!(TIME IN [7.32204e7:7.32206e7])`. The syntax `(TIME <= 73227600)` includes only events with times less than or equal to `73227600`, and the "!" symbol stands for the logical "not", so use `&&!(TIME in [7.32118e7:7.3212e7])` to exclude events in that time interval. Once the new GTI file is made, we apply it with `evselect`. Everything else remains the same as in §6.5.1.
@@ -370,43 +368,45 @@ Alternatively, we could have chosen to make a new GTI file by noting the times o
 gti_time_file = 'gti_rate.fits'
 mos1_filt_time = 'mos1_filt_time.fits'
 
-inargs = ['table={0}'.format(light_curve_file), 
-          'gtiset={0}'.format(gti_time_file),
-          'timecolumn=TIME', 
-          "expression='(TIME <= 73227600)&&!(TIME IN [7.32118e7:7.3212e7])&&!(TIME IN [7.32204e7:7.32206e7])'"]
+inargs = {'table'      : light_curve_file, 
+          'gtiset'     : gti_time_file,
+          'timecolumn' : 'TIME', 
+          "expression" : "'(TIME <= 73227600)&&!(TIME IN [7.32118e7:7.3212e7])&&!(TIME IN [7.32204e7:7.32206e7])'"}
 
-w('tabgtigen', inargs).run()
+MyTask('tabgtigen', inargs).run()
 
-inargs = ['table={0}'.format(filtered_event_list),
-          'withfilteredset=yes', 
-          "expression='GTI({0},TIME)'".format(gti_time_file), 
-          'filteredset={0}'.format(mos1_filt_time),
-          'filtertype=expression', 
-          'keepfilteroutput=yes',
-          'updateexposure=yes', 
-          'filterexposure=yes']
+inargs = {'table'           : filtered_event_list,
+          'withfilteredset' : 'yes', 
+          "expression"      : "'GTI({0},TIME)'".format(gti_rate_file), 
+          'filteredset'     : mos1_filt_rate,
+          'filtertype'      : 'expression', 
+          'keepfilteroutput': 'yes',
+          'updateexposure'  : 'yes', 
+          'filterexposure'  : 'yes'}
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 ```
 
 We can now plot the image that has been filtered on `TIME` and compare it to the image that was been filtered on `RATE` from §6.5.1.
 
 ```python
 make_fits_image(mos1_filt_time, image_file='final_image2.fits')
-plot_light_curve(mos1_filt_time)
+my_obs.quick_lcplot(mos1_filt_time)
 ```
 
-#### 6.5.3 Using `gtibuild` to make a new GTI file and filter on `TIME`
+### 6.3 Using `gtibuild` to make a new GTI file and filter on `TIME`
 
 
 This method requires a text file as input. The file should be in ASCII format with eash row on a new line and values for each column separated by spaces. In the first two columns, enter the start and end times (in seconds) that you are interested in, and in the third column, indicate with either a + or - sign whether that region should be kept or removed. Each good (or bad) time interval should get its own line, with any optional comments preceeded by a "#". In the example case, we would write in our ASCII file (named gti.txt):
 
 ```python
+gti_txt_file = 'gti.txt'
+
 gti_lines = ['0        73227600 + # Good time from the start of the observation',
              '73211800 73212000 - # But without a small flare here.',
              '73220400 73220600 - # And here.']
 
-with open('gti.txt', 'w') as f:
+with open(gti_txt_file, 'w') as f:
     f.writelines(gti_lines)
 ```
 
@@ -419,46 +419,46 @@ The inputs for `gtibuild` are:
     table - output GTI file name
 
 ```python
-gti_txt_file = 'gti.txt'
 new_gti_file = 'new_gti.fits'
-mos1_new_gti = 'mos1_new_gti.fits'
 
-inargs = ['file={0}'.format(gti_txt_file),
-          'table={0}'.format(new_gti_file)]
+inargs = {'file'  : gti_txt_file,
+          'table' : new_gti_file}
 
-w('gtibuild', inargs).run()
+MyTask('gtibuild', inargs).run()
 ```
 
 We can now run `evselect` as before with the new GTI file.
 
 ```python
-inargs = ['table={0}'.format(filtered_event_list),
-          'withfilteredset=yes', 
-          "expression='GTI({0},TIME)'".format(new_gti_file), 
-          'filteredset={0}'.format(mos1_new_gti),
-          'filtertype=expression', 
-          'keepfilteroutput=yes',
-          'updateexposure=yes', 
-          'filterexposure=yes']
+mos1_new_gti = 'mos1_new_gti.fits'
 
-w('evselect', inargs).run()
+inargs = {'table'           : filtered_event_list,
+          'withfilteredset' : 'yes', 
+          "expression"      : "'GTI({0},TIME)'".format(new_gti_file), 
+          'filteredset'     : mos1_new_gti,
+          'filtertype'      : 'expression', 
+          'keepfilteroutput': 'yes',
+          'updateexposure'  : 'yes', 
+          'filterexposure'  : 'yes'}
+
+MyTask('evselect', inargs).run()
 ```
 
 If you want, you can compare the new image and light curve to what was made previously.
 
 ```python
 make_fits_image(mos1_new_gti, image_file='final_image3.fits')
-plot_light_curve(mos1_new_gti)
+my_obs.quick_lcplot(mos1_new_gti)
 ```
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
-#### 6.5.4 Filter on `TIME` by Explicit Reference
+### 6.4 Filter on `TIME` by Explicit Reference
 <!-- #endregion -->
 
 Finally, we could have chosen to forgo making a secondary GTI file altogether, and simply filtered on `TIME` with the standard filtering expression (see §6.3). The filtering expression from §6.3 can be combined with the filtering expression from §6.5.2 and filter the raw data all in one step. In this case, the full filtering expression would be:
 
 ```python
-expression = "expression='(PATTERN <= 12)&&(PI in [200:12000])&&#XMMEA_EM&&(TIME <= 73227600) &&!(TIME IN [7.32118e7:7.3212e7])&&!(TIME IN [7.32204e7:7.32206e7])'"
+expression = "'(PATTERN <= 12)&&(PI in [200:12000])&&#XMMEA_EM&&(TIME <= 73227600) &&!(TIME IN [7.32118e7:7.3212e7])&&!(TIME IN [7.32204e7:7.32206e7])'"
 ```
 
 and we would run `evselect` as the same way we did in §6.3.
@@ -466,47 +466,47 @@ and we would run `evselect` as the same way we did in §6.3.
 ```python
 full_filt_event_list = 'mos1_filt.fits'
 
-inargs = ['table={0}'.format(mos1), 
-          'withfilteredset=yes', 
-          expression, 
-          'filteredset={0}'.format(full_filt_event_list), 
-          'filtertype=expression', 
-          'keepfilteroutput=yes', 
-          'updateexposure=yes', 
-          'filterexposure=yes']
+inargs = {'table'           : mos1,
+          'withfilteredset' : 'yes', 
+          "expression"      : expression, 
+          'filteredset'     : full_filt_event_list,
+          'filtertype'      : 'expression', 
+          'keepfilteroutput': 'yes',
+          'updateexposure'  : 'yes', 
+          'filterexposure'  : 'yes'}
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 ```
 
 Finally we can compare the result with what we made before.
 
 ```python
 make_fits_image(full_filt_event_list, image_file='final_image4.fits')
-plot_light_curve(full_filt_event_list)
+my_obs.quick_lcplot(full_filt_event_list)
 ```
 
-### Conclusion
+## 7. Conclusion
 
 We have demonstrated various filtering techniques to remove noise from the raw observation data. Note: How you filter on `RATE` or `TIME` will depend on the light curve of each individual observation. For exceptionally bright sources you may only have to apply the standard filter.
 
-In Part 2 we will cover source detection, spectra extraction, pile up, and preparing the spectra for analysis by creating a redistribution matrix file (RMF) and an ancillary response file (ARF).
+To continue on from here, the next Jupyter Notebook in the series covers [source detection, spectra extraction, pile up, and preparing the spectra for analysis](./analysis-xmm-ABC-guide-EPIC-source-spectrum.md) by creating a redistribution matrix file (RMF) and an ancillary response file (ARF).
 
 
 ---
 
 Below we have included a short script that incorporates all of the filtering steps for a single observation for MOS1, but without making any plots or image files. 
 
-<!-- #region -->
+<!-- #region editable=true slideshow={"slide_type": ""} -->
 ```python
 obsid = '0123700101'
 from SciServer import Authentication as auth
 usr = auth.getKeystoneUserWithToken(auth.getToken()).userName
 data_dir = os.path.join('/home/idies/workspace/Temporary/',usr,'scratch/xmm_data')
-odf = pysas.odfcontrol.ODFobject(obsid)
-odf.basic_setup(data_dir=data_dir,overwrite=False,repo='sciserver',rerun=False)
+my_obs = pysas.obsid.ObsID(obsid,data_dir=data_dir)
+my_obs.basic_setup(overwrite=False,repo='sciserver',rerun=False)
 
-os.chdir(odf.work_dir)
-unfiltered_event_list = odf.files['m1evt_list'][0]
+os.chdir(my_obs.work_dir)
+unfiltered_event_list = my_obs.files['m1evt_list'][0]
 
 # The User can change these file names
 temporary_event_list = 'temporary_event_list.fits' # Created by the "standard" filter
@@ -515,46 +515,48 @@ gti_rate_file = 'gti_rate.fits'                    # GTI file name
 filtered_event_list = 'filtered_event_list.fits'   # Final filtered 
 
 # "Standard" Filter
-inargs = ['table={0}'.format(unfiltered_event_list), 
-          'withfilteredset=yes', 
-          "expression='(PATTERN <= 12)&&(PI in [200:4000])&&#XMMEA_EM'", 
-          'filteredset={0}'.format(temporary_event_list), 
-          'filtertype=expression', 
-          'keepfilteroutput=yes', 
-          'updateexposure=yes', 
-          'filterexposure=yes']
+inargs = {'table'           : unfiltered_event_list, 
+          'withfilteredset' : 'yes', 
+          "expression"      : "'(PATTERN <= 12)&&(PI in [200:4000])&&#XMMEA_EM'", 
+          'filteredset'     : temporary_event_list, 
+          'filtertype'      : 'expression', 
+          'keepfilteroutput': 'yes', 
+          'updateexposure'  : 'yes', 
+          'filterexposure'  : 'yes'}
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 
 # Make Light Curve File
-inargs = ['table={0}'.format(temporary_event_list), 
-          'withrateset=yes', 
-          'rateset={0}'.format(light_curve_file), 
-          'maketimecolumn=yes', 
-          'timecolumn=TIME', 
-          'timebinsize=100', 
-          'makeratecolumn=yes']
+inargs = {'table'          : temporary_event_list, 
+          'withrateset'    : 'yes', 
+          'rateset'        : light_curve_file, 
+          'maketimecolumn' : 'yes', 
+          'timecolumn'     : 'TIME', 
+          'timebinsize'    : '100', 
+          'makeratecolumn' : 'yes'}
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 
 # Make Secondary GTI File
-inargs = ['table={0}'.format(light_curve_file), 
-          'gtiset={0}'.format(gti_rate_file),
-          'timecolumn=TIME', 
-          "expression='(RATE <= 6)'"]
+# Chose the rate based on the plot from the light curve file
+filter_rate = 6
+inargs = {'table'      : light_curve_file, 
+          'gtiset'     : gti_rate_file,
+          'timecolumn' : 'TIME', 
+          "expression" : "'(RATE <= {0})'".format(filter_rate)}
 
-w('tabgtigen', inargs).run()
+MyTask('tabgtigen', inargs).run()
 
 # Filter Using Secondary GTI File
-inargs = ['table={0}'.format(temporary_event_list),
-          'withfilteredset=yes', 
-          "expression='GTI({0},TIME)'".format(gti_rate_file), 
-          'filteredset={0}'.format(filtered_event_list),
-          'filtertype=expression', 
-          'keepfilteroutput=yes',
-          'updateexposure=yes', 
-          'filterexposure=yes']
+inargs = {'table'           : temporary_event_list,
+          'withfilteredset' : 'yes', 
+          "expression"      : "'GTI({0},TIME)'".format(gti_rate_file), 
+          'filteredset'     : filtered_event_list,
+          'filtertype'      : 'expression', 
+          'keepfilteroutput': 'yes',
+          'updateexposure'  : 'yes', 
+          'filterexposure'  : 'yes'}
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 ```
 <!-- #endregion -->

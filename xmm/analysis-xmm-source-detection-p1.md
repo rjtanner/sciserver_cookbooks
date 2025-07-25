@@ -7,27 +7,29 @@ jupyter:
       format_version: '1.3'
       jupytext_version: 1.16.0
   kernelspec:
-    display_name: (xmmsas)
+    display_name: (heasoft)
     language: python
-    name: conda-env-xmmsas-py
+    name: conda-env-heasoft-py
 ---
 
+<!-- #region editable=true slideshow={"slide_type": ""} -->
 # Source Detection with `edetect_chain` -- Part 1
 <hr style="border: 2px solid #fadbac" />
 
 - **Description:** Using `edetect_chain` to automatically detect sources.
 - **Level:** Intermediate
 - **Data:** XMM observation of the Lockman Hole (obsid=0123700101)
-- **Requirements:** Must be run using the `HEASARCv6.35` image. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
+- **Requirements:** Must be run using the `HEASARCv6.35` (or higher) image, along with pySAS version 2.0. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
 - **Credit:** Ryan Tanner (March 2025)
 - **Support:** <a href="https://heasarc.gsfc.nasa.gov/docs/xmm/xmm_helpdesk.html">XMM Newton GOF Helpdesk</a>
-- **Last verified to run:** 26 March 2025, for SAS v22.1 and pySAS v1.4.8
+- **Last verified to run:** 21 July 2025, for SAS v22.1 and pySAS v2.0
 
 <hr style="border: 2px solid #fadbac" />
+<!-- #endregion -->
 
-
-## Introduction
-This tutorial is a variation on the introductory notebooks on preparing an observation for analysis, image creation, filtering, and source extraction (XMM-Newton ABC Guide, Chapter 6, [Part 1](./analysis-xmm-ABC-guide-ch6-p1.ipynb) and [Part 2](./analysis-xmm-ABC-guide-ch6-p2.ipynb)). This notebook assumes you are at least minimally familiar with pySAS on SciServer (see the [Long pySAS Introduction](./analysis-xmm-long-intro.md "Long pySAS Intro")) and that you have previously worked through the two introductory notebooks.
+<!-- #region editable=true slideshow={"slide_type": ""} -->
+## 1. Introduction
+This tutorial is a variation on the introductory notebooks on preparing an observation for analysis, image creation, filtering, and source extraction (XMM-Newton ABC Guide, Chapter 7, [Part 1](./analysis-xmm-ABC-guide-EPIC-image-filtering.md) and [Part 2](./analysis-xmm-ABC-guide-EPIC-source-spectrum.md)). This notebook assumes you are at least minimally familiar with pySAS on SciServer (see the [Long pySAS Introduction](./analysis-xmm-long-intro.md "Long pySAS Intro")) and that you have previously worked through the two introductory notebooks.
 
 In the two introductory notebooks a single source and a background region were selected by hand with the coordinates determined before hand. Now we will use the SAS task `edetect_chain` to automatically detect sources in an image. We will also demonstrate a few of the potential problems you might run into using `edetect_chain`.
 
@@ -58,11 +60,14 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
 <div class="alert alert-block alert-warning">
     <b>Warning:</b> By default this notebook will place observation data files in your <tt>scratch</tt> space. The <tt>scratch</tt> space on SciServer will only retain files for 90 days. If you wish to keep the data files for longer move them into your <tt>persistent</tt> directory.
 </div>
+<!-- #endregion -->
 
-```python
+## 2. Setup
+
+```python editable=true slideshow={"slide_type": ""}
 # pySAS imports
 import pysas
-from pysas.wrapper import Wrapper as w
+from pysas.sastask import MyTask
 
 # Importing Js9
 import jpyjs9
@@ -79,7 +84,7 @@ os.environ['HEADASNOQUERY'] = ''
 os.environ['HEADASPROMPT']  = '/dev/null'
 ```
 
-```python
+```python editable=true slideshow={"slide_type": ""}
 obsid = '0123700101'
 
 # To get your user name. Or you can just put your user name in the path for your data.
@@ -87,15 +92,18 @@ from SciServer import Authentication as auth
 usr = auth.getKeystoneUserWithToken(auth.getToken()).userName
 
 data_dir = os.path.join('/home/idies/workspace/Temporary/',usr,'scratch/xmm_data')
-odf = pysas.odfcontrol.ODFobject(obsid)
-odf.basic_setup(data_dir=data_dir,overwrite=False,repo='sciserver',rerun=False,
-                run_epproc=False,run_rgsproc=False)
-os.chdir(odf.work_dir)
+my_obs = pysas.obsid.ObsID(obsid,data_dir=data_dir)
+
+my_obs.basic_setup(overwrite=False,repo='sciserver',rerun=False,
+                   run_epproc=False,run_rgsproc=False,
+                   emproc_args={'options':'-V 2'})
+my_obs.download_PPS_data(repo='sciserver')
+os.chdir(my_obs.work_dir)
 ```
 
 ```python
 # File names for this notebook. The User can change these file names.
-unfiltered_event_list = odf.files['M1evt_list'][0]
+unfiltered_event_list = my_obs.files['M1evt_list'][0]
 first_filter_event_list = 'first_filter_event_list.fits'
 light_curve_file ='mos1_ltcrv.fits'
 gti_rate_file = 'gti_rate.fits'
@@ -110,9 +118,9 @@ large_filtered_image = 'large_filtered_image.fits'
 eml_list_file = 'emllist.fits'
 ```
 
-## Filter the Observation
+## 3. Filter the Observation
 
-The following filtering follows exactly the filtering done in the ABC Guide Chapter 6, [Part 1](./analysis-xmm-ABC-guide-ch6-p1.ipynb).
+The following filtering follows exactly the filtering done in the ABC Guide Chapter 7, [Part 1](./analysis-xmm-ABC-guide-ch6-p1.md).
 
 ```python
 def display_fits_image(event_list_file, image_file='image.fits'):
@@ -126,7 +134,7 @@ def display_fits_image(event_list_file, image_file='image.fits'):
               'ximagesize=600', 
               'yimagesize=600']
 
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 
     with fits.open(image_file) as hdu:
         my_js9.SetFITS(hdu)
@@ -147,7 +155,7 @@ inargs = ['table={0}'.format(unfiltered_event_list),
           'updateexposure=yes', 
           'filterexposure=yes']
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 
 # Make Light Curve File
 inargs = ['table={0}'.format(first_filter_event_list), 
@@ -158,7 +166,7 @@ inargs = ['table={0}'.format(first_filter_event_list),
           'timebinsize=100', 
           'makeratecolumn=yes']
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 
 # Make Secondary GTI File
 inargs = ['table={0}'.format(light_curve_file), 
@@ -166,7 +174,7 @@ inargs = ['table={0}'.format(light_curve_file),
           'timecolumn=TIME', 
           "expression='(RATE <= 6)'"]
 
-w('tabgtigen', inargs).run()
+MyTask('tabgtigen', inargs).run()
 
 # Filter Using Secondary GTI File
 inargs = ['table={0}'.format(first_filter_event_list),
@@ -178,20 +186,21 @@ inargs = ['table={0}'.format(first_filter_event_list),
           'updateexposure=yes', 
           'filterexposure=yes']
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 
 # Make attitude file
 inargs = ['atthkset={0}'.format(attitude_file),
           'timestep=1']
 
-w('atthkgen', inargs).run()
+MyTask('atthkgen', inargs).run()
 ```
 
 ```python
 display_fits_image(filtered_event_list,image_file=filtered_image_file)
 ```
 
-## Make a Large Image for Analysis
+<!-- #region editable=true slideshow={"slide_type": ""} -->
+## 4 .Make a Large Image for Analysis
 
 Above we defined a function `display_fits_image` to generate a FITS image for display purposes. In that function the size of the FITS image was set (`imagebinning=imageSize`, 600x600 pixels) and events in the event list were binned accordingly. While that size of image is fine for quick looks at the data, the resolution is too low for good analysis. Below we define another function, `make_large_image` to make a FITS image, but here we set the bin size (`imagebinning=binSize`, 20x20 arcseconds). Events will be binned accordingly. This creates a much higher resolution image suitable for data analysis.
 
@@ -201,6 +210,7 @@ For now we will make a high resolution image using the default settings, but lat
 
 <div class="alert alert-block alert-info">
 <b>Note:</b> The resulting high resolution image will be quite large (>20 MB). Currently JS9 struggles to display such a large image on SciServer. So for display purposes we will use the lower resolution image, but for analysis we will use the higher resolution image.</div>
+<!-- #endregion -->
 
 ```python
 # High resolution image function
@@ -219,7 +229,7 @@ def make_large_image(event_list_file,image_file,xbinsize=20,ybinsize=20,pimin=30
               'filtertype'    : 'expression',
               'expression'    : expression}
 
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 
 # Function to run edetect_chain
 def run_edetect_chain(large_filtered_image,filtered_event_list,attitude_file,eml_list,
@@ -235,12 +245,12 @@ def run_edetect_chain(large_filtered_image,filtered_event_list,attitude_file,eml
               'likemin'     : likemin,
               'eml_list'    : eml_list}
     
-    w('edetect_chain', inargs).run()
+    MyTask('edetect_chain', inargs).run()
 
 # Function to make regions and load into JS9
 def make_regions(source_list):
     my_js9.RemoveRegions('all')
-    with fits.open(eml_list_file) as hdu:
+    with fits.open(source_list) as hdu:
         data = hdu[1].data[hdu[1].data['ID_BAND'] == 1]
     for i in range(len(data)):
         my_js9.AddRegions("circle", {'ra': data['RA'][i], 'dec': data['DEC'][i], 'radius': 10.0})
@@ -273,9 +283,10 @@ xbinsize=50
 ybinsize=50
 
 eml_list_lores = 'emllist_lores.fits'
+large_filtered_image_lores = 'large_filtered_image_lores.fits'
 
-make_large_image(filtered_event_list, large_filtered_image,xbinsize=xbinsize,ybinsize=ybinsize)
-run_edetect_chain(large_filtered_image,filtered_event_list,attitude_file,eml_list_lores)
+make_large_image(filtered_event_list, large_filtered_image_lores,xbinsize=xbinsize,ybinsize=ybinsize)
+run_edetect_chain(large_filtered_image_lores,filtered_event_list,attitude_file,eml_list_lores)
 make_regions(eml_list_lores)
 ```
 
@@ -283,7 +294,7 @@ make_regions(eml_list_lores)
 print('Number of regions: {}'.format(len(my_js9.GetRegions())))
 ```
 
-Because the image is lower resolution `edetect_chain` will run faster, but we can also see that the number of sources detected has gone down from 42 to 20 (though the number of duplicates has also gone down).
+Because the image is lower resolution `edetect_chain` will run faster, but we can also see that the number of sources detected has gone down from 62 to 58 (though the number of duplicates has also gone down).
 
 As a default we restricted source detection over the energy range 0.3-2.0 keV. Now let's see what happens if we expand the energy range to 0.3-8.0 keV, but return to the original resolution of 20x20 arcseconds.
 
@@ -292,9 +303,10 @@ pimin=300
 pimax=8000
 
 eml_list_hipimax = 'emllist_hipimax.fits'
+large_filtered_image_hipimax = 'large_filtered_image_hipimax.fits'
 
-make_large_image(filtered_event_list, large_filtered_image,pimin=pimin,pimax=pimax)
-run_edetect_chain(large_filtered_image,filtered_event_list,attitude_file,eml_list_hipimax,pimin=pimin,pimax=pimax)
+make_large_image(filtered_event_list, large_filtered_image_hipimax,pimin=pimin,pimax=pimax)
+run_edetect_chain(large_filtered_image_hipimax,filtered_event_list,attitude_file,eml_list_hipimax,pimin=pimin,pimax=pimax)
 make_regions(eml_list_hipimax)
 ```
 
@@ -302,7 +314,7 @@ make_regions(eml_list_hipimax)
 print('Number of regions: {}'.format(len(my_js9.GetRegions())))
 ```
 
-We see that the number of detected sources has dropped to 4. This shows that the algorithm for `edetect_chain` is sensitive to the energy range given for detecting sources. Generally a narrower energy range will be better for source detection.
+We see that the number of detected sources has increased to 70. This shows that the algorithm for `edetect_chain` is sensitive to the energy range given for detecting sources. Generally a narrower energy range will be better for source detection.
 
 Next let us try two other parameters. The first is `likemin` which is the detection likelihood threshold. The default is 10. Let's set it to something higher and see what we get.
 
@@ -310,9 +322,10 @@ Next let us try two other parameters. The first is `likemin` which is the detect
 likemin=20
 
 eml_list_hilikemin = 'emllist_hilikemin.fits'
+large_filtered_image_hilikemin = 'large_filtered_image_hilikemin.fits'
 
-make_large_image(filtered_event_list, large_filtered_image)
-run_edetect_chain(large_filtered_image,filtered_event_list,attitude_file,eml_list_hilikemin,likemin=likemin)
+make_large_image(filtered_event_list, large_filtered_image_hilikemin)
+run_edetect_chain(large_filtered_image_hilikemin,filtered_event_list,attitude_file,eml_list_hilikemin,likemin=likemin)
 make_regions(eml_list_hilikemin)
 ```
 
@@ -320,31 +333,29 @@ make_regions(eml_list_hilikemin)
 print('Number of regions: {}'.format(len(my_js9.GetRegions())))
 ```
 
-With a higher detection likelihood threshold we only get 32 sources, instead of 42 using the default value.
+With a higher detection likelihood threshold we only get 33 sources, instead of 62 using the default value.
 
 Now let's try another parameter. There is the parameter `eml_ecut` which is the event cut-out radius as measured in pixels.
-
-<div class="alert alert-block alert-info">
-<b>Note:</b> We have the function calls commented out because this takes ~50 minutes to run. If you do wish to run the following cells, just uncomment the lines.</div>
 
 ```python
 eml_ecut=30
 
 eml_list_hieml_ecut = 'emllist_hieml_ecut.fits'
+large_filtered_image_hieml_ecut = 'large_filtered_image_hieml_ecut.fits'
 
-#make_large_image(filtered_event_list, large_filtered_image)
-#run_edetect_chain(large_filtered_image,filtered_event_list,attitude_file,eml_list_hieml_ecut,eml_ecut=eml_ecut)
-#make_regions(eml_list_hieml_ecut)
+make_large_image(filtered_event_list, large_filtered_image_hieml_ecut)
+run_edetect_chain(large_filtered_image_hieml_ecut,filtered_event_list,attitude_file,eml_list_hieml_ecut,eml_ecut=eml_ecut)
+make_regions(eml_list_hieml_ecut)
 ```
 
 ```python
-#print('Number of regions: {}'.format(len(my_js9.GetRegions())))
+print('Number of regions: {}'.format(len(my_js9.GetRegions())))
 ```
 
-With this parameter change we also get 32 source detections.
+With this parameter change we get 63 source detections.
 
 
-## Automatic Spectra Extraction
+## 5. Automatic Spectra Extraction
 
 Below we provide an example function that can be used to automatically extract spectra from all sources, along with background regions. As inputs it takes a filtered event list and the source list generated by `edetect_chain`. The outputs will be a corresponding source event list, background event list, source spectrum, background spectrum, RMF, ARF, and binned spectrum file for each source. The files for each source will start with 'MMMsXXX' where MMM is the instrument and XXX is the source number.
 
@@ -371,6 +382,7 @@ def extract_spectra_from_source(filtered_event_list,eml_list_file,instrument):
         # Add source region and background annulus
         my_js9.AddRegions("circle", {'ra': data['RA'][i], 'dec': data['DEC'][i], 'radius': 4.0})
         my_js9.AddRegions("annulus", {'ra': data['RA'][i], 'dec': data['DEC'][i], 'radii': [5,15]})
+        regions = my_js9.GetRegions()
         source_region = regions[-2]
         bkg_region = regions[-1]
         source_loc = source_region['lcs']
@@ -392,7 +404,7 @@ def extract_spectra_from_source(filtered_event_list,eml_list_file,instrument):
                   'specchannelmin': '0',
                   'specchannelmax': '11999'}
         
-        w('evselect', inargs).run()
+        MyTask('evselect', inargs).run()
 
         # Extract spectrum from background
         expression = "((X,Y) in CIRCLE({x:.1f},{y:.1f},{radiuso:.1f}))&&!((X,Y) in CIRCLE({x:.1f},{y:.1f},{radiusi:.1f}))".format(x=bkg_loc['x'], y=bkg_loc['y'], radiuso=bkg_loc['radii'][1], radiusi=bkg_loc['radii'][0])
@@ -410,14 +422,14 @@ def extract_spectra_from_source(filtered_event_list,eml_list_file,instrument):
                   'specchannelmin': '0',
                   'specchannelmax': '11999'}
         
-        w('evselect', inargs).run()
+        MyTask('evselect', inargs).run()
 
         # Generate rmf for source
         inargs = {}
         inargs = {'rmfset': rmf_file,
                   'spectrumset': source_spectra}
         
-        w('rmfgen', inargs).run()
+        MyTask('rmfgen', inargs).run()
 
         # Generate arf for source
         inargs = {}
@@ -429,7 +441,7 @@ def extract_spectra_from_source(filtered_event_list,eml_list_file,instrument):
                   'badpixlocation': filtered_event_list,
                   'setbackscale': 'yes'}
         
-        w('arfgen', inargs).run()
+        MyTask('arfgen', inargs).run()
 
         # Bin events in spectrum and link arf and rmf
         inargs = {}
@@ -440,6 +452,6 @@ def extract_spectra_from_source(filtered_event_list,eml_list_file,instrument):
                   'backgndset': bkg_spectra,
                   'mincounts': '30'}
         
-        w('specgroup', inargs).run()
+        MyTask('specgroup', inargs).run()
 ```
 <!-- #endregion -->

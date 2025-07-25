@@ -18,10 +18,10 @@ jupyter:
 - **Description:** A short introduction to pySAS on sciserver.
 - **Level:** Beginner
 - **Data:** XMM observation of NGC 3079 (obsid=0802710101)
-- **Requirements:** Must be run using the `HEASARCv6.35` image. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
+- **Requirements:** Must be run using the `HEASARCv6.35` (or higher) image, along with pySAS version 2.0. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
 - **Credit:** Ryan Tanner (April 2024)
 - **Support:** <a href="https://heasarc.gsfc.nasa.gov/docs/xmm/xmm_helpdesk.html">XMM Newton GOF Helpdesk</a>
-- **Last verified to run:** 26 March 2025, for SAS v22.1 and pySAS v1.4.8
+- **Last verified to run:** 21 July 2025, for SAS v22.1 and pySAS v2.0
 
 <hr style="border: 2px solid #fadbac" />
 
@@ -49,7 +49,7 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
 
 ## 2. Import pySAS and Set `obsid`
 
-```python
+```python editable=true slideshow={"slide_type": ""}
 import os
 import pysas
 
@@ -61,7 +61,8 @@ data_dir = os.path.join('/home/idies/workspace/Temporary/',usr,'scratch/xmm_data
 obsid = '0802710101'
 ```
 
-## 3. Run `odf.basic_setup`
+<!-- #region editable=true slideshow={"slide_type": ""} -->
+## 3. Run `ObsID.basic_setup`
 
 When you run the cell below the following things will happen.
 
@@ -77,42 +78,50 @@ When you run the cell below the following things will happen.
 6. `basic_setup` will then run the basic pipeline tasks `emproc`, `epproc`, and `rgsproc`. The output of these three tasks will be in the `work_dir`.
 
 That is it! Your data is now calibrated, processed, and ready for use with all the standard SAS commands!
+<!-- #endregion -->
 
-```python
-odf = pysas.odfcontrol.ODFobject(obsid)
-odf.basic_setup(data_dir=data_dir,repo='sciserver',overwrite=False)
+```python editable=true slideshow={"slide_type": ""}
+my_obs = pysas.obsid.ObsID(obsid,data_dir=data_dir)
+my_obs.basic_setup(repo='sciserver',overwrite=False)
 ```
 
-If you want more information on the function `basic_setup` run the cell below or see the long introduction tutorial.
+<!-- #region editable=true slideshow={"slide_type": ""} -->
+If you want more information on the function `basic_setup` run the cell below or see the long introduction tutorial. All the methods available in the `ObsID` object have documentation that can be accessed by putting a question mark '?' after the name of the method, as shown below.
+<!-- #endregion -->
 
 ```python
-odf.basic_setup?
+my_obs.basic_setup?
 ```
 
+<!-- #region editable=true slideshow={"slide_type": ""} -->
 ## 4. Running SAS Tasks
-To run SAS tasks, especially ones not written in Python, you will need to import a wrapper from pySAS. SAS tasks should be run from the work directory. The location of the work direcotry is stored as a variable in `odf.work_dir`.
+To run SAS tasks, pySAS has a dedicated class called `MyTask`. SAS tasks should be run from the work directory. The location of the work direcotry is stored as a variable in `my_obs.work_dir`.
+<!-- #endregion -->
 
-```python
-from pysas.wrapper import Wrapper as w
-os.chdir(odf.work_dir)
+```python editable=true slideshow={"slide_type": ""}
+from pysas.sastask import MyTask
+os.chdir(my_obs.work_dir)
 ```
 
-The wrapper, imported as `w`, takes two inputs, the name of the SAS task to run, and a Python list of all the input arguments for that task. For example, to run a task with no input arguments you simply provide an empty list as the second argument.
+<!-- #region editable=true slideshow={"slide_type": ""} -->
+The class, `MyTask`, takes at least two inputs, the name of the SAS task to run, and a Python dictionary of all the input arguments for that task. For example, to run a task with no input arguments you simply provide an empty dictionary as the second argument.
+<!-- #endregion -->
 
 ```python
-inargs = []
-w('emproc', inargs).run()
+inargs = {}
+MyTask('emproc', inargs).run()
 ```
 
 The most common SAS tasks to run are: `epproc`, `emproc`, and `rgsproc`. Each one can be run without inputs (but some inputs are needed for more advanced analysis). These tasks have been folded into the function `basic_setup`, but they can be run individually.
 
-You can list all input arguments available to any SAS task with option `'--help'` (or `'-h'`),
+You can list all input arguments available to any SAS task with the option `'--help'` (or `'-h'`),
 
-```python
-w('emproc', ['-h']).run()
+```python editable=true slideshow={"slide_type": ""}
+MyTask('emproc', '-h').run()
 ```
 
-If there are multiple input arguments then each needs to be a separate string in the Python list. For example, here is how to apply a "standard" filter. This is equivelant to running the following SAS command:
+<!-- #region editable=true slideshow={"slide_type": ""} -->
+If there are multiple input arguments then in the input dictionary they are entered as 'key'-'value' pairs. The keys are the input parameters and the values are the input values. The values should be entered as a string (or as a variable that is a string). For example, here is how to apply a "standard" filter. This is equivelant to running the following SAS command:
 
 ```
 evselect table=unfiltered_event_list.fits withfilteredset=yes \
@@ -121,19 +130,20 @@ evselect table=unfiltered_event_list.fits withfilteredset=yes \
     updateexposure=yes filterexposure=yes
 ```
 
-The input arguments should be in a list, with each input argument a separate string. Note: Some inputs require single quotes to be preserved in the string. This can be done using double quotes to form the string. i.e. `"expression='(PATTERN <= 12)&&(PI in [200:4000])&&#XMMEA_EM'"`
+The input arguments should be in a dictionary, with each input vaule a single string. Note: Some inputs require single quotes to be preserved in the string. This can be done using double quotes to form the string. i.e. `"'(PATTERN <= 12)&&(PI in [200:4000])&&#XMMEA_EM'"`
+<!-- #endregion -->
 
-```python
+```python editable=true slideshow={"slide_type": ""}
 unfiltered_event_list = "3278_0802710101_EMOS1_S001_ImagingEvts.ds"
 
-inargs = ['table={0}'.format(unfiltered_event_list), 
-          'withfilteredset=yes', 
-          "expression='(PATTERN <= 12)&&(PI in [200:4000])&&#XMMEA_EM'", 
-          'filteredset=filtered_event_list.fits', 
-          'filtertype=expression', 
-          'keepfilteroutput=yes', 
-          'updateexposure=yes', 
-          'filterexposure=yes']
+inargs = {'table'            : unfiltered_event_list,
+          'withfilteredset'  : 'yes',
+          'expression'       : "'(PATTERN <= 12)&&(PI in [200:4000])&&#XMMEA_EM'",
+          'filteredset'      : 'filtered_event_list.fits',
+          'filtertype'       : 'expression',
+          'keepfilteroutput' : 'yes',
+          'updateexposure'   : 'yes',
+          'filterexposure'   : 'yes'}
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 ```

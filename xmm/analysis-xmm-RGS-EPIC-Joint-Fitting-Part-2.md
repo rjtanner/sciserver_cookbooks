@@ -12,19 +12,20 @@ jupyter:
     name: conda-env-xmmsas-py
 ---
 
+<!-- #region editable=true slideshow={"slide_type": ""} -->
 # ABC Guide for XMM-Newton -- RGS+EPIC Joint Spectral Fitting Part 2: Fitting the Spectra
 <hr style="border: 2px solid #fadbac" />
 
 - **Description:** A short introduction to joint fitting RGS and EPIC spectra on SciServer.
 - **Level:** Advanced
 - **Data:** XMM observation of Mkn 509 (obsid=0601390201)
-- **Requirements:** Must be run using the `HEASARCv6.35` image. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
+- **Requirements:** Must be run using the `HEASARCv6.35` (or higher) image, along with pySAS version 2.0. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
 - **Credit:** Jenna Cann (March 2025)
 - **Support:** <a href="https://heasarc.gsfc.nasa.gov/docs/xmm/xmm_helpdesk.html">XMM Newton GOF Helpdesk</a>
-- **Last verified to run:** 28 March 2025, for SAS v22.1 and pySAS v1.4.8
+- **Last verified to run:** 21 July 2025, for SAS v22.1 and pySAS v2.0
 
 <hr style="border: 2px solid #fadbac" />
-
+<!-- #endregion -->
 
 ## 1. Introduction
 This tutorial provides a short, basic introduction to joint fitting RGS and EPIC data on SciServer. This is Part 2, and assumes that you have already run Part 1, where we reprocess the relevant data using pyXSpec.
@@ -42,12 +43,15 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
     <b>Warning:</b> By default this notebook will place observation data files in your <tt>scratch</tt> space. The <tt>scratch</tt> space on SciServer will only retain files for 90 days. If you wish to keep the data files for longer move them into your <tt>persistent</tt> directory.
 </div>
 
-```python
+
+## 2. Setup
+
+```python editable=true slideshow={"slide_type": ""}
 import xspec
 import os
 
 import pysas
-from pysas.wrapper import Wrapper as w
+from pysas.sastask import MyTask
 
 # Importing Js9
 import jpyjs9
@@ -77,9 +81,12 @@ usr = auth.getKeystoneUserWithToken(auth.getToken()).userName
 
 data_dir = os.path.join('/home/idies/workspace/Temporary/',usr,'scratch/xmm_data')
 
-odf = pysas.odfcontrol.ODFobject(obsid,data_dir=data_dir)
-os.chdir(odf.work_dir)
+my_obs = pysas.obsid.ObsID(obsid,data_dir=data_dir)
+os.chdir(my_obs.work_dir)
 ```
+
+## 3. XSPEC Model
+
 
 For this tuturial we will be using a specialized absoption model. `XSPEC` comes with a number of prebuilt models for spectral fitting. But it is possible to load your own models into XSPEC. In this case the model is in a FITS table. Due to the size (~150 MB) you will have to download the model from the HEASARC website. The following cells will download the FITS file and place it in the work directory for the ObsID.
 
@@ -100,28 +107,31 @@ filename = wget.download(url)
 
 ```python
 # Linking filenames
-bkg_R1spectra  = [os.path.join(odf.work_dir,'P0601390201R1S004BGSPEC1001.FIT'),
-                               os.path.join(odf.work_dir,'P0601390201R1S004BGSPEC2001.FIT')]
-bkg_R2spectra  = [os.path.join(odf.work_dir,'P0601390201R2S005BGSPEC1001.FIT'),
-                               os.path.join(odf.work_dir,'P0601390201R2S005BGSPEC2001.FIT')]
+bkg_R1spectra  = [os.path.join(my_obs.work_dir,'P0601390201R1S004BGSPEC1001.FIT'),
+                               os.path.join(my_obs.work_dir,'P0601390201R1S004BGSPEC2001.FIT')]
+bkg_R2spectra  = [os.path.join(my_obs.work_dir,'P0601390201R2S005BGSPEC1001.FIT'),
+                               os.path.join(my_obs.work_dir,'P0601390201R2S005BGSPEC2001.FIT')]
 
-rmf_R1spectra  = [os.path.join(odf.work_dir,'P0601390201R1S004RSPMAT1001.FIT'),
-                               os.path.join(odf.work_dir,'P0601390201R1S004RSPMAT2001.FIT')]
-rmf_R2spectra  = [os.path.join(odf.work_dir,'P0601390201R2S005RSPMAT1001.FIT'),
-                               os.path.join(odf.work_dir,'P0601390201R2S005RSPMAT2001.FIT')]
+rmf_R1spectra  = [os.path.join(my_obs.work_dir,'P0601390201R1S004RSPMAT1001.FIT'),
+                               os.path.join(my_obs.work_dir,'P0601390201R1S004RSPMAT2001.FIT')]
+rmf_R2spectra  = [os.path.join(my_obs.work_dir,'P0601390201R2S005RSPMAT1001.FIT'),
+                               os.path.join(my_obs.work_dir,'P0601390201R2S005RSPMAT2001.FIT')]
 
 
-mos1_spectrum  = os.path.join(odf.work_dir,'mos1_grp25.fits')
-mos2_spectrum = os.path.join(odf.work_dir,'mos2_grp25.fits')
+mos1_spectrum  = os.path.join(my_obs.work_dir,'mos1_grp25.fits')
+mos2_spectrum = os.path.join(my_obs.work_dir,'mos2_grp25.fits')
 ```
+
+## 4. PyXSPEC
+
 
 Now we will initialize the EPIC and RGS spectra into PyXSpec for analysis, as well as their respective rmfs, arfs, and background files.
 
 ```python
-RGS1o1 = odf.files['R1spectra'][0]
-RGS1o2 = odf.files['R1spectra'][1]
-RGS2o1 = odf.files['R2spectra'][0]
-RGS2o2 = odf.files['R2spectra'][1]
+RGS1o1 = my_obs.files['R1spectra'][0]
+RGS1o2 = my_obs.files['R1spectra'][1]
+RGS2o1 = my_obs.files['R2spectra'][0]
+RGS2o2 = my_obs.files['R2spectra'][1]
 
 bkg_RGS1o1 = bkg_R1spectra[0]
 bkg_RGS1o2 = bkg_R1spectra[1]
@@ -138,24 +148,24 @@ rmf_RGS2o2 = rmf_R2spectra[1]
 xspec.AllData("1:1 {:s}".format(mos1_spectrum))
 
 s1 = xspec.AllData(1)
-s1.response = os.path.join(odf.work_dir,'mos1.rmf')
-s1.response.arf = os.path.join(odf.work_dir,'mos1.arf')
+s1.response = os.path.join(my_obs.work_dir,'mos1.rmf')
+s1.response.arf = os.path.join(my_obs.work_dir,'mos1.arf')
 s1.ignore('**-0.3, 6.0-**')
 ```
 
-```python
+```python editable=true slideshow={"slide_type": ""}
 xspec.AllData -= "*"
 
 xspec.AllData("1:1 {:s} 2:2 {:s} 3:3 {:s} 4:4 {:s} 5:5 {:s} 6:6 {:s}".format(mos1_spectrum, mos2_spectrum, RGS1o1, RGS1o2, RGS2o1, RGS2o2))
 
 s1 = xspec.AllData(1)
-s1.response = os.path.join(odf.work_dir,'mos1.rmf')
-s1.response.arf = os.path.join(odf.work_dir,'mos1.arf')
+s1.response = os.path.join(my_obs.work_dir,'mos1.rmf')
+s1.response.arf = os.path.join(my_obs.work_dir,'mos1.arf')
 s1.ignore('**-0.3, 6.0-**')
 
 s2 = xspec.AllData(2)
-s2.response = os.path.join(odf.work_dir,'mos2.rmf')
-s2.response.arf = os.path.join(odf.work_dir,'mos2.arf')
+s2.response = os.path.join(my_obs.work_dir,'mos2.rmf')
+s2.response.arf = os.path.join(my_obs.work_dir,'mos2.arf')
 s2.ignore('**-0.3, 6.0-**')
 
 s3 = xspec.AllData(3)

@@ -7,9 +7,9 @@ jupyter:
       format_version: '1.3'
       jupytext_version: 1.16.0
   kernelspec:
-    display_name: (xmmsas)
+    display_name: (heasoft)
     language: python
-    name: conda-env-xmmsas-py
+    name: conda-env-heasoft-py
 ---
 
 # How to reprocess ODFs to generate calibrated and concatenated EPIC event lists
@@ -18,10 +18,10 @@ jupyter:
 - **Description:** A guide for processing data from all EPIC cameras on XMM.
 - **Level:** Beginner
 - **Data:** XMM observation of RX J122135.6+280613 (obsid=0104860501)
-- **Requirements:** Must be run using the `HEASARCv6.35` image. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
+- **Requirements:** Must be run using the `HEASARCv6.35` (or higher) image, along with pySAS version 2.0. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
 - **Credit:** Ryan Tanner (April 2024)
 - **Support:** <a href="https://heasarc.gsfc.nasa.gov/docs/xmm/xmm_helpdesk.html">XMM Newton GOF Helpdesk</a>
-- **Last verified to run:** 26 March 2025, for SAS v22.1 and pySAS v1.4.8
+- **Last verified to run:** 22 July 2025, for SAS v22.1 and pySAS v2.0
 
 <hr style="border: 2px solid #fadbac" />
 
@@ -81,7 +81,7 @@ ___
 ```python
 # pySAS imports
 import pysas
-from pysas.wrapper import Wrapper as w
+from pysas.sastask import MyTask
 
 # Useful imports
 import os
@@ -103,26 +103,29 @@ from SciServer import Authentication as auth
 usr = auth.getKeystoneUserWithToken(auth.getToken()).userName
 
 data_dir = os.path.join('/home/idies/workspace/Temporary/',usr,'scratch/xmm_data')
-odf = pysas.odfcontrol.ODFobject(obsid)
-odf.basic_setup(data_dir=data_dir,overwrite=False,repo='sciserver',rerun=False,run_rgsproc=False)
+my_obs = pysas.obsid.ObsID(obsid,data_dir=data_dir)
+my_obs.basic_setup(overwrite=False,repo='sciserver',
+                   rerun=False,run_rgsproc=False,
+                   epproc_args={'options':'-V 1'},emproc_args={'options':'-V 1'})
 ```
 
-The odf object contains a dictionary with the path and filename for important output files created by `basic_setup`.
+The `my_obs` object contains a dictionary with the path and filename for important output files created by `basic_setup`.
 
 ```python
-instrument_files = list(odf.files.keys())
-print(instrument_files,'\n')
-for instrument in instrument_files:
-    print(f'File Type: {instrument}')
-    print('>>> {0}'.format(odf.files[instrument]),'\n')
+file_keys = list(my_obs.files.keys())
+print(file_keys,'\n')
+for key in file_keys:
+    if key == 'ODF':
+        # Skip the list of ODF files, because it is LONG
+        continue
+    print(f'File Type: {key}')
+    print('>>> {0}'.format(my_obs.files[key]),'\n')
 ```
 
 ## 3. Visualize the contents of the event files just created
 
 
-To visualize the output we will apply a simple filter to remove some background noise and then create a FITS image file from the event list from each detector (EPIC-pn, EPIC-MOS1, EPIC-MOS2). To help with this we define two functions.
-
-The first function applies a simple filter to the data. The inputs are:
+To visualize the output we will apply a simple filter to remove some background noise and then create a FITS image file from the event list from each detector (EPIC-pn, EPIC-MOS1, EPIC-MOS2). To filter the data we will define a function and the inputs are:
 
 - unfiltered_event_list: File name of the event list to be filtered.
 - mos: If using MOS1 or MOS2 set mos=True, if using the pn set mos=False
@@ -157,14 +160,11 @@ def apply_simple_filter(unfiltered_event_list,mos=True,pattern=12,
               'updateexposure=yes', 
               'filterexposure=yes']
     
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 ```
 
-The second function will create a FITS image file and plot it. The inputs are:
-
-- event_list_file: File name of the event list to be plotted.
-- image_file: Name of the output FITS image file.
-
+<!-- #region -->
+For plotting we will use a built in function called `quick_eplot` that is part of the `ObsID` object. The equivelent function code is shown below:
 ```python
 def make_fits_image(event_list_file, image_file='image.fits'):
     
@@ -177,7 +177,7 @@ def make_fits_image(event_list_file, image_file='image.fits'):
               'ximagesize=600', 
               'yimagesize=600']
 
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 
     hdu = fits.open(image_file)[0]
     wcs = WCS(hdu.header)
@@ -191,6 +191,7 @@ def make_fits_image(event_list_file, image_file='image.fits'):
     plt.colorbar()
     plt.show()
 ```
+<!-- #endregion -->
 
 In the cell below we will range over all event lists from the three EPIC instruments (EPIC-pn, EPIC-MOS1, EPIC-MOS2). An image file will be created from each event list and a plot will be made.
 
@@ -209,11 +210,11 @@ mos_pi_min    = 300.    # Low energy range eV
 mos_pi_max    = 20000.  # High energy range eV
 mos_flag      = None    # FLAG
 
-os.chdir(odf.work_dir)
+os.chdir(my_obs.work_dir)
 
-pnevt_list = odf.files['PNevt_list']
-m1evt_list = odf.files['M1evt_list']
-m2evt_list = odf.files['M2evt_list']
+pnevt_list = my_obs.files['PNevt_list']
+m1evt_list = my_obs.files['M1evt_list']
+m2evt_list = my_obs.files['M2evt_list']
 
 # Filter pn and make FITS image file
 if len(pnevt_list) > 0:
@@ -226,7 +227,8 @@ if len(pnevt_list) > 0:
                             pi_min=pn_pi_min,
                             pi_max=pn_pi_max,
                             filtered_event_list=filtered_event_list)
-        make_fits_image(filtered_event_list, image_file=image_file)
+        
+        my_obs.quick_eplot(filtered_event_list, image_file=image_file)
 
 # Filter mos1 and make FITS image file
 if len(m1evt_list) > 0:
@@ -239,7 +241,8 @@ if len(m1evt_list) > 0:
                             pi_min=mos_pi_min,
                             pi_max=mos_pi_max,
                             filtered_event_list=filtered_event_list)
-        make_fits_image(filtered_event_list, image_file=image_file)
+
+        my_obs.quick_eplot(filtered_event_list, image_file=image_file)
 
 # Filter mos2 and make FITS image file
 if len(m2evt_list) > 0:
@@ -252,155 +255,6 @@ if len(m2evt_list) > 0:
                             pi_min=mos_pi_min,
                             pi_max=mos_pi_max,
                             filtered_event_list=filtered_event_list)
-        make_fits_image(filtered_event_list, image_file=image_file)
 
-```
-
-## 4. How to accomplish specific reduction tasks
-
-[<tt>emproc</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/emproc/index.html) and [<tt>epproc</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/epproc/index.html) are highly flexible tasks, which allow the user to perform a wide range of customized reduction tasks. Some [<tt>emproc</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/emproc/index.html) examples are listed below. The same customized reduction tasks can be performed for the EPIC-pn as well, just by substituting [<tt>emproc</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/emproc/index.html) with [<tt>epproc</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/epproc/index.html) in the commands.
-
-<div class="alert alert-block alert-info">
-<b>Note:</b> In the cells below the commands to run each SAS task have been commented out. If you wish to run the commands uncomment the relevant cells.</div>
-
-- If you want to reduce only one of the cameras (EPIC-MOS1 in the example):
-
-    <tt>emproc selectinstruments=yes emos1=yes</tt>
-
-```python
-# SAS Command
-cmd    = "emproc" # SAS task to be executed                  
-
-# Arguments of SAS Command
-inargs = ['selectinstruments=yes','emos1=yes']
-
-print("   SAS command to be executed: "+cmd+", with arguments; \n")
-inargs
-```
-
-```python
-# w(cmd, inargs).run()
-```
-
-- If you want to reduce only a subsample of exposures:
-
-    <tt>emproc withinstexpids=yes instexpids="M1S001 M2S002"</tt>
-
-```python
-# SAS Command
-cmd    = "emproc" # SAS task to be executed                  
-
-# Arguments of SAS Command
-inargs = ['withinstexpids=yes','instexpids="M1S001 M2S002"']
-
-print("   SAS command to be executed: "+cmd+", with arguments; \n")
-inargs
-```
-
-```python
-# w(cmd, inargs).run()
-```
-
-- If you want to reduce data from 1 CCD only (#4 and #5 in the example):
-
-    <tt>emproc selectccds=yes ccd4=yes ccd5=yes</tt>
-
-```python
-# SAS Command
-cmd    = "emproc" # SAS task to be executed                  
-
-# Arguments of SAS Command
-inargs = ['selectccds=yes','ccd4=yes','ccd5=yes']
-
-print("   SAS command to be executed: "+cmd+", with arguments; \n")
-inargs
-```
-
-```python
-# w(cmd, inargs).run()
-```
-
-- If you want to change the reference pointing for the calculation of the sky coordinates to a value of your choice:
-
-    <tt>emproc referencepointing=user ra=34.65646 dec=-12.876546</tt>
-
-```python
-# SAS Command
-cmd    = "emproc" # SAS task to be executed                  
-
-# Arguments of SAS Command
-inargs = ['referencepointing=user','ra=34.65646','dec=-12.876546']
-
-print("   SAS command to be executed: "+cmd+", with arguments; \n")
-inargs
-```
-
-```python
-# w(cmd, inargs).run()
-```
-
-- Please be aware that if you want to supply coordinates for the analysis of the EPIC-MOS Timing mode, the command is slightly different, e.g.:
-
-    <tt>emproc withsrccoords=yes srcra=34.65646 srcdec=-12.876546</tt>
-
-- If you want to filter the event list events, using an external Good Time Interval (GTI) file (see the corresponding thread on how to filter event files for flaring particle background by creating a GTI file):
-
-    <tt>emproc withgtiset=yes gtiset=mygti.gti filterevents=yes</tt>
-
-```python
-# SAS Command
-cmd    = "emproc" # SAS task to be executed                  
-
-# Arguments of SAS Command
-inargs = ['withgtiset=yes','gtiset=mygti.gti','filterevents=yes']
-
-print("   SAS command to be executed: "+cmd+", with arguments; \n")
-inargs
-```
-
-```python
-# w(cmd, inargs).run()
-```
-
-Parameters can be combined to accomplish simultaneously two or more of the above tasks during the same run.
-
-The user is referred to the on-line documentation of [<tt>emproc</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/emproc/index.html) and [<tt>epproc</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/epproc/index.html) for a complete list of the available options.
-
-
-## 5. Reduction of EPIC-pn Timing Mode exposures
-
-Most exposures in EPIC-pn Timing Mode are affected by X-ray Loading (XRL; cf. Sect.3.1 in Guainazzi et al., 2013, [XMM-SOC-CAL-TN-0083](http://xmm2.esac.esa.int/docs/documents/CAL-TN-0083.pdf)). Furthermore, a residual dependence of the energy scale on the total count rate is corrected through the "Rate-Dependent PHA" correction (Guainazzi, 2014, [XMM-CCF-REL-312](http://xmm2.esac.esa.int/docs/documents/CAL-SRN-0312-1-4.pdf)). In order to correct for these effects a set of default calibration settings have been identified. As of SAS v14.0, this is controlled by a single parameter within the tasks [<tt>epproc</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/epproc/index.html) and [<tt>epchain</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/epchain/index.html). This parameter is called <tt>withdefaultcal</tt> and is set to <tt>yes</tt> by default. Setting <tt>withdefaultcal=yes</tt> implies <tt>runepreject=yes withxrlcorrection=yes runepfast=no withrdpha=yes</tt>. So one shall run the EPIC-pn reduction meta-tasks as follows:
-
-&emsp;&emsp;<tt>epproc </tt>
-
-or:
-
-&emsp;&emsp;<tt>epchain datamode=TIMING</tt>
-
-For more information please refer to the documentation of [<tt>epproc</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/epproc/index.html) and [<tt>epchain</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/epchain/index.html).
-
-
-## 6. Reduction of EPIC-pn Burst Mode exposures
-
-Most exposures in EPIC-pn Burst Mode are affected by X-ray Loading (XRL; cf. Sect.3.1 in Guainazzi et al., 2013, [XMM-SOC-CAL-TN-0083](http://xmm2.esac.esa.int/docs/documents/CAL-TN-0083.pdf)). Furthermore, a residual dependence of the energy scale on the total count rate is corrected through the "Rate-Dependent CTI" correction. In order to correct for these effects a set of default calibration settings have been identified. As of SAS v14.0, this is controlled by a single parameter within the tasks [<tt>epproc</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/epproc/index.html) and [<tt>epchain</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/epchain/index.html). This parameter is called <tt>withdefaultcal</tt> and is set to <tt>yes</tt> by default. Setting <tt>withdefaultcal=yes</tt> implies <tt>runepreject=yes withxrlcorrection=yes runepfast=yes withrdpha=no</tt>. So one shall run the EPIC-pn reduction meta-tasks as follows:
-
-&emsp;&emsp;<tt>epproc burst=yes</tt>
-
-Notice the inclusion of the extra parameter <tt>burst=yes</tt> in the call to [<tt>epproc</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/epproc/index.html) and [<tt>epchain</tt>](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/epchain/index.html) also needs an extra parameter:
-
-&emsp;&emsp;<tt>epchain datamode=BURST</tt>
-
-```python
-# SAS Command
-cmd    = "epchain" # SAS task to be executed                  
-
-# Arguments of SAS Command
-inargs = ['datamode=BURST']
-
-print("   SAS command to be executed: "+cmd+", with arguments; \n")
-inargs
-```
-
-```python
-# w(cmd,inargs).run()
+        my_obs.quick_eplot(filtered_event_list, image_file=image_file)
 ```

@@ -13,22 +13,22 @@ jupyter:
 ---
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
-# ABC Guide for XMM-Newton -- Chapter 10 (RGS Data Processing)
+# ABC Guide for XMM-Newton -- RGS Data Processing
 <hr style="border: 2px solid #fadbac" />
 
-- **Description:** XMM-Newton ABC Guide, Chapter 10.
+- **Description:** XMM-Newton ABC Guide, RGS Data Processing.
 - **Level:** Beginner
-- **Data:** XMM observation of Mkn 421(obsid=0153950701)
-- **Requirements:** Must be run using the `HEASARCv6.35` image. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
+- **Data:** XMM observation of Mkn 421 (obsid=0153950701)
+- **Requirements:** Must be run using the `HEASARCv6.35` (or higher) image, along with pySAS version 2.0. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
 - **Credit:** Ryan Tanner (April 2024)
 - **Support:** <a href="https://heasarc.gsfc.nasa.gov/docs/xmm/xmm_helpdesk.html">XMM Newton GOF Helpdesk</a>
-- **Last verified to run:** 26 March 2025, for SAS v22.1 and pySAS v1.4.8
+- **Last verified to run:** 21 July 2025, for SAS v22.1 and pySAS v2.0
 
 <hr style="border: 2px solid #fadbac" />
 <!-- #endregion -->
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
-#### Introduction
+## 1. Introduction
 This tutorial is based on Chapter 10 from the [The XMM-Newton ABC Guide](https://heasarc.gsfc.nasa.gov/docs/xmm/abc/ "ABC Guide") prepared by the NASA/GSFC XMM-Newton Guest Observer Facility. 
 #### Expected Outcome
 The ability to process RGS data and prepare it for analysis.
@@ -69,7 +69,7 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
 ```python editable=true slideshow={"slide_type": ""}
 # pySAS imports
 import pysas
-from pysas.wrapper import Wrapper as w
+from pysas.sastask import MyTask
 
 # Importing Js9
 import jpyjs9
@@ -91,7 +91,7 @@ my_js9 = jpyjs9.JS9(width = 800, height = 800, side=True)
 ```
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
-### 10.1 : Rerun basic processing
+## 2. Rerun basic processing
 <!-- #endregion -->
 
 <div class="alert alert-block alert-info">
@@ -107,23 +107,24 @@ usr = auth.getKeystoneUserWithToken(auth.getToken()).userName
 
 data_dir = os.path.join('/home/idies/workspace/Temporary/',usr,'scratch/xmm_data')
 
-odf = pysas.odfcontrol.ODFobject(obsid)
+my_obs = pysas.obsid.ObsID(obsid,data_dir=data_dir)
 ```
 
 We start by reprocessing the data. Since we are only interested in the RGS data we do not have to run `epproc` and `emproc`. By default `basic_setup` will run `epproc`,`emproc`, and `rgsproc`, so we will set `run_epproc` and `run_emproc` to `False`.
 
-We will also use the rgsproc inputs, `orders='1 2' bkgcorrect=no withmlambdacolumn=yes spectrumbinning=lambda`. For this analysis we will also need a single PPS file in addition to the `ODF` files, so we will download it separately. You could alternatively download all of the `ODF` and `PPS` files by setting `level='ALL'`.
+We will also use the rgsproc inputs, `orders='1 2' bkgcorrect=no withmlambdacolumn=yes spectrumbinning=lambda`. For this analysis we will also need a single PPS file in addition to the `ODF` files, so we will download it separately. You could alternatively download all of the `ODF` and `PPS` files by using the function '`download_ALL_data`' or all the `PPS` files by using '`download_PPS_data`' with no additional inputs.
 
 ```python editable=true slideshow={"slide_type": ""}
-rgsproc_args = ["orders='1 2'",
-                'bkgcorrect=no',
-                'withmlambdacolumn=yes',
-                'spectrumbinning=lambda']
-odf.basic_setup(data_dir=data_dir,overwrite=False,repo='sciserver',rerun=False,
-                run_epproc=False,run_emproc=False,rgsproc_args=rgsproc_args)
+rgsproc_args = {'orders'            : "'1 2'",
+                'bkgcorrect'        : 'no',
+                'withmlambdacolumn' : 'yes',
+                'spectrumbinning'   : 'lambda'}
 
-odf.download_data(data_dir=data_dir,repo='sciserver',level='PPS',
-                  filename='P0153950701OBX000CALIND0000.FTZ')
+my_obs.basic_setup(overwrite=False,repo='sciserver',rerun=False,
+                   run_epproc=False,run_emproc=False,
+                   rgsproc_args=rgsproc_args)
+
+my_obs.download_PPS_data(repo='sciserver',filename='P0153950701OBX000CALIND0000.FTZ')
 ```
 
 The input arguments for `rgsproc` are:
@@ -135,13 +136,13 @@ The input arguments for `rgsproc` are:
 
 Note the last keyword, `spectrumbinning`. If you want to merge data from the same orders in RGS1 and RGS2, keep it at the default value `lambda`. If you want to merge data from the same instrument, with different orders, set it to `beta`. Merging spectra is discussed in §10.6.
 
-This takes several minutes, and outputs 12 files per RGS, plus 3 general use FITS files. As before, links to the event list files are stored in `odf.files['R1evt_list']` and `odf.files['R2evt_list']`. Filenames and paths to any spectra produced can be found in `odf.files['R1spectra']` and `odf.files['R2spectra']`.
+This takes several minutes, and outputs 12 files per RGS, plus 3 general use FITS files. As before, links to the event list files are stored in `my_obs.files['R1evt_list']` and `my_obs.files['R2evt_list']`. Filenames and paths to any spectra produced can be found in `my_obs.files['R1spectra']` and `my_obs.files['R2spectra']`.
 
 ```python
-print(odf.files['R1evt_list'])
-print(odf.files['R2evt_list'])
-print(odf.files['R1spectra'])
-print(odf.files['R2spectra'])
+print(my_obs.files['R1evt_list'])
+print(my_obs.files['R2evt_list'])
+print(my_obs.files['R1spectra'])
+print(my_obs.files['R2spectra'])
 ```
 
 <div class="alert alert-block alert-info">
@@ -149,22 +150,22 @@ print(odf.files['R2spectra'])
 </div>
 
 
-### 10.1.1 : Potentially useful tips for using the pipeline
+### 2.1 Potentially useful tips for using the pipeline
 
 
 The pipeline task, rgsproc, is very flexible and can address potential pitfalls for RGS users. In §10.1, we used a simple set of parameters with the task; if this is sufficient for your data (and it should be for most), feel free to skip to later sections, where data filters are discussed. In the following subsections, we will look at the cases of a nearby bright optical source, a nearby bright X-ray source, and a user-defined source.
 
 
-### 10.1.2 : A Nearby Bright Optical Source
+### 2.2 A Nearby Bright Optical Source
 
 <!-- #region -->
 With certain pointing angles, zeroth-order optical light may be reflected off the telescope optics and cast onto the RGS CCD detectors. If this falls on an extraction region, the current energy calibration will require a wavelength-dependent zero-offset. Stray light can be detected on RGS DIAGNOSTIC images taken before, during and after the observation. This test, and the offset correction, are not performed on the data before delivery. Please note that this will not work in every case. If a source is very bright, the diagnostic data that this relies on may not have been downloaded from the telescope in order to save bandwidth. Also, the RGS target itself cannot be the source of optical photons, as the spectrum's zero-order falls far from the RGS chip array. To check for stray light and apply the appropriate offsets, use the following inputs.
 
 ```python
-rgsproc_args = ["orders='1 2'",
-                'bkgcorrect=no',
-                'calcoffsets=yes',
-                'withoffsethistogram=no']
+rgsproc_args = {'orders'      : "'1 2'",
+                'bkgcorrect'  : 'no',
+                'calcoffsets' :'yes',
+                'withoffsethistogram' : 'no'}
 ```
 
 where the parameters are as described in §10.1 and
@@ -173,17 +174,17 @@ calcoffsets - calculate PHA offsets from diagnostic image    s
 withoffsethistogram - produce a histogram of uncalibrated excess for the user
 <!-- #endregion -->
 
-### 10.1.3 : A Nearby Bright X-ray Source
+### 2.3 A Nearby Bright X-ray Source
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
 In the example above, it is assumed that the field around the source contains sky only. Provided a bright background source is well-separated from the target in the cross-dispersion direction, a mask can be created that excludes it from the background region. Here the source has been identified in the EPIC images and its coordinates have been taken from the EPIC source list which is included among the pipeline products. The bright neighboring object is found to be the third source listed in the sources file. The first source is the target. The inputs would be
 
 ```python
-rgsproc_args = ["orders='1 2'",
-                'bkgcorrect=no',
-                'withepicset=yes',
-                'epicset=P0153950701EPX000OMSRLI0000.FTZ',
-                "exclsrcsexpr='INDEX==1&&INDEX==3'"]
+rgsproc_args = {'orders'       : "'1 2'",
+                'bkgcorrect'   : 'no',
+                'withepicset'  : 'yes',
+                'epicset'      : 'P0153950701EPX000OMSRLI0000.FTZ',
+                'exclsrcsexpr' : "'INDEX==1&&INDEX==3'"}
 ```
 
 where the parameters are as described in §10.1 and
@@ -197,19 +198,19 @@ where the parameters are as described in §10.1 and
 </div>
 <!-- #endregion -->
 
-### 10.1.4 : User-defined Source Coordinates
+### 2.4 User-defined Source Coordinates
 
 <!-- #region -->
 If the true coordinates of an object are not included in the EPIC source list or the science proposal, the user can define the coordinates of a new source by typing:
 
 ```python
-rgsproc_args = ["orders='1 2'",
-                'bkgcorrect=no',
-                'withsrc=yes',
-                'srclabel=Mkn421',
-                'srcstyle=radec',
-                'srcra=166.113808',
-                'srcdec=+38.208833']
+rgsproc_args = {'orders'   : "'1 2'",
+                'bkgcorrect' : 'no',
+                'withsrc'  : 'yes',
+                'srclabel' : 'Mkn421',
+                'srcstyle' : 'radec',
+                'srcra'    : '166.113808',
+                'srcdec'   : '+38.208833'}
 ```
 
 where the parameters are as described in §10.1 and
@@ -223,7 +224,7 @@ where the parameters are as described in §10.1 and
 Since the event files are current, we can proceed with some simple analysis demonstrations, which will allow us to generate filters. Rememer that all tasks should be called from the work directory, and that tasks place output files in whatever directory you are in when they are called.
 <!-- #endregion -->
 
-### 10.2 : Create and Display an Image
+## 3. Create and Display an Image
 
 
 Two commonly-made plots are those showing PI vs. BETA_CORR (also known as 'banana plots') and XDSP_CORR vs. BETA_CORR.
@@ -254,7 +255,7 @@ def make_fits_image(event_list_file, image_file='image.fits', xcolumn='BETA_CORR
     if expression != None:
         inargs['expression'] = expression
     
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 
     with fits.open(image_file) as hdu:
         my_js9.SetFITS(hdu)
@@ -265,14 +266,14 @@ def make_fits_image(event_list_file, image_file='image.fits', xcolumn='BETA_CORR
 ```
 
 ```python
-os.chdir(odf.work_dir)
-R1_event_list = odf.files['R1evt_list'][0]
-R2_event_list = odf.files['R2evt_list'][0]
+os.chdir(my_obs.work_dir)
+R1_event_list = my_obs.files['R1evt_list'][0]
+R2_event_list = my_obs.files['R2evt_list'][0]
 make_fits_image(R1_event_list,image_file='pi_bc.fits')
 make_fits_image(R1_event_list,image_file='xd_bc.fits', xcolumn='BETA_CORR', ycolumn='XDSP_CORR')
 ```
 
-### 10.3 : Create and Display a Light Curve
+## 4. Create and Display a Light Curve
 
 
 The background is assessed through examination of the light curve. We will extract a region, CCD9, that is most susceptible to proton events and generally records the least source events due to its location close to the optical axis. Also, to avoid confusing solar flares for source variability, a region filter that removes the source from the final event list should be used. The region filters are kept in the source file product `*SRCLI_*.FIT`. `rgsproc` outputs an `M_LAMBDA` column which can be used to generate the light curve. (The `*SRCLI_*.FIT` file that came with the PPS products contains a `BETA_CORR` column if you prefer to use that instead.)
@@ -292,18 +293,18 @@ The input arguments to `evselect` to create a light curve file are:
 ```python editable=true slideshow={"slide_type": ""}
 def plot_light_curve(event_list_file, light_curve_file='ltcrv.fits',expression=None):
                      
-    inargs = {'table': event_list_file, 
-              'withrateset': 'yes', 
-              'rateset': light_curve_file, 
-              'maketimecolumn': 'yes', 
-              'timecolumn': 'TIME', 
-              'timebinsize': '50', 
-              'makeratecolumn': 'yes'}
+    inargs = {'table'          : event_list_file, 
+              'withrateset'    : 'yes', 
+              'rateset'        : light_curve_file, 
+              'maketimecolumn' : 'yes', 
+              'timecolumn'     : 'TIME', 
+              'timebinsize'    : '50', 
+              'makeratecolumn' : 'yes'}
 
     if expression != None:
         inargs['expression'] = expression
 
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 
     ts = Table.read(light_curve_file,hdu=1)
     plt.plot(ts['TIME'],ts['RATE'])
@@ -323,7 +324,7 @@ expression = '(CCDNR==9)&&(REGION(P0153950701R1S001SRCLI_0000.FIT:RGS1_BACKGROUN
 plot_light_curve(R1_event_list, light_curve_file=light_curve_file, expression=expression)
 ```
 
-### 10.4.1 : Generating the Good Time Interval (GTI) File
+### 4.1 Generating the Good Time Interval (GTI) File
 
 
 Examination of the lightcurve shows that there is a loud section at the end of the observation, after 1.36975e8 seconds, where the count rate is well above the quiet count rate of $\sim$ 0.05-0.2 count/second. To remove it, we need to make an additional Good Time Interval (GTI) file and apply it by rerunning `rgsproc`.
@@ -335,15 +336,15 @@ If we look at the light curve we just made we see that the typical count rate fo
 ```python
 gti_file = 'gti.fits'
 
-inargs = ['table={0}'.format(light_curve_file), 
-          'gtiset={0}'.format(gti_file),
-          'timecolumn=TIME', 
-          "expression='(RATE <= 0.2)'"]
+inargs = {'table'      : light_curve_file, 
+          'gtiset'     : gti_file,
+          'timecolumn' : 'TIME', 
+          'expression' : "'(RATE <= 0.2)'"}
 
-w('tabgtigen', inargs).run()
+MyTask('tabgtigen', inargs).run()
 ```
 
-### 10.4.2 : Apply the new GTI
+### 4.2 Apply the new GTI
 
 
 Now that we have a GTI file, we can apply it by running `rgsproc` again. `rgsproc` is a complex task, running several steps, with five different entry and exit points. It is not necessary to rerun all the steps in the procedure, only the ones involving filtering.
@@ -354,14 +355,14 @@ To apply the GTI file we run:
     <b>Note:</b> This will overwrite the original event list created when we ran <b>rgsproc</b> at the beginning.</div>
 
 ```python
-inargs = ["orders='1 2'",
-          'auxgtitables={0}'.format(gti_file),
-          'bkgcorrect=no',
-          'withmlambdacolumn=yes',
-          'entrystage=3:filter',
-          'finalstage=5:fluxing']
+inargs = {'orders'            : "'1 2'",
+          'auxgtitables'      : gti_file,
+          'bkgcorrect'        : 'no',
+          'withmlambdacolumn' : 'yes',
+          'entrystage'        : '3:filter',
+          'finalstage'        : '5:fluxing'}
 
-w('rgsproc', inargs).run()
+MyTask('rgsproc', inargs).run()
 ```
 
 where
@@ -374,7 +375,7 @@ where
     finalstage - stage at which to end processing
 
 
-### 10.5 : Creating the Response Matrices (RMFs)
+## 5. Creating the Response Matrices (RMFs)
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
 <div class="alert alert-block alert-info">
@@ -395,20 +396,20 @@ rmf1_file = 'r1_o1_rmf.fits'
 rmf2_file = 'r2_o1_rmf.fits'
 
 inargs = {}
-inargs['spectrumset'] = odf.files['R1spectra'][0]
+inargs['spectrumset'] = my_obs.files['R1spectra'][0]
 inargs['rmfset']      = rmf1_file
 inargs['evlist']      = R1_event_list
 inargs['emin']        = '0.4'
 inargs['emax']        = '2.5'
 inargs['rows']        = '4000'
 
-w('rgsrmfgen', inargs).run()
+MyTask('rgsrmfgen', inargs).run()
 
-inargs['spectrumset'] = odf.files['R2spectra'][0]
+inargs['spectrumset'] = my_obs.files['R2spectra'][0]
 inargs['rmfset']      = rmf2_file
 inargs['evlist']      = R2_event_list
 
-w('rgsrmfgen', inargs).run()
+MyTask('rgsrmfgen', inargs).run()
 ```
 
 where
@@ -423,7 +424,7 @@ where
 RMFs for the RGS1 2nd order, and for the RGS2 1st and 2nd orders, are made in a similar way. At this point, the spectra can be analyzed or combined with other spectra.
 
 
-### 10.6 : Combining Spectra
+## 6 Combining Spectra
 
 
 Spectra from the same order in RGS1 and RGS2 can be safely combined to create a spectrum with higher signal-to-noise if they were reprocessed using `rgsproc` with `spectrumbinning=lambda`, as we did in §10.1 (this also happens to be the default). (Spectra of different orders, from one particular instrument, can also be merged if they were reprocessed using `rgsproc` with `spectrumbinning=beta`.) The task `rgscombine` also merges response files and background spectra. When merging response files, be sure that they have the same number of bins. For this example, we will use the RMFs that were made using `rgsproc` for order 1 in both RGS1 and RGS2.
@@ -432,7 +433,7 @@ To merge the first order RGS1 and RGS2 spectra we run,
 
 ```python
 inargs = {}
-inargs['pha']     = '{0} {1}'.format(odf.files['R1spectra'][0],odf.files['R2spectra'][0])
+inargs['pha']     = '{0} {1}'.format(my_obs.files['R1spectra'][0],my_obs.files['R2spectra'][0])
 inargs['rmf']     = 'P0153950701R1S001RSPMAT1001.FIT P0153950701R2S002RSPMAT1001.FIT'
 inargs['bkg']     = 'P0153950701R1S001BGSPEC1001.FIT P0153950701R2S002BGSPEC1001.FIT'
 inargs['filepha'] = 'r12_o1_srspec.fits'
@@ -440,7 +441,7 @@ inargs['filermf'] = 'r12_o1_rmf.fits'
 inargs['filebkg'] = 'r12_o1_bgspec.fits'
 #inargs['rmfgrid'] = 4000
 
-w('rgscombine', inargs).run()
+MyTask('rgscombine', inargs).run()
 ```
 
 where

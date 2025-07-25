@@ -18,16 +18,16 @@ jupyter:
 - **Description:** Introduction on how to deal with pile-up from a bright source.
 - **Level:** Intermediate
 - **Data:** XMM observation of Algol (obsid=0112880701)
-- **Requirements:** Must be run using the `HEASARCv6.35` image. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
+- **Requirements:** Must be run using the `HEASARCv6.35` (or higher) image, along with pySAS version 2.0. Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
 - **Credit:** Ryan Tanner (March 2025)
 - **Support:** <a href="https://heasarc.gsfc.nasa.gov/docs/xmm/xmm_helpdesk.html">XMM Newton GOF Helpdesk</a>
-- **Last verified to run:** 26 March 2025, for SAS v22.1 and pySAS v1.4.8
+- **Last verified to run:** 21 July 2025, for SAS v22.1 and pySAS v2.0
 
 <hr style="border: 2px solid #fadbac" />
 
 
-## Introduction
-This tutorial is a supplement to the introductory notebooks on extracting a source in from EPIC data (XMM-Newton ABC Guide, Chapter 6, [Part 1](./analysis-xmm-ABC-guide-ch6-p1.ipynb) and [Part 2](./analysis-xmm-ABC-guide-ch6-p2.ipynb)). This notebook assumes you are at least minimally familiar with pySAS on SciServer (see the [Long pySAS Introduction](./analysis-xmm-long-intro.md "Long pySAS Intro")) and that you have previously worked through the two introductory notebooks. This tutorial is partially based on the SAS thread [How to evaluate and test pile-up in an EPIC source](https://www.cosmos.esa.int/web/xmm-newton/sas-thread-epatplot).
+## 1. Introduction
+This tutorial is a supplement to the introductory notebooks on extracting a source in from EPIC data (XMM-Newton ABC Guide, Chapter 7, [Part 1](./analysis-xmm-ABC-guide-ch6-p1.md) and [Part 2](./analysis-xmm-ABC-guide-ch6-p2.md)). This notebook assumes you are at least minimally familiar with pySAS on SciServer (see the [Long pySAS Introduction](./analysis-xmm-long-intro.md "Long pySAS Intro")) and that you have previously worked through the two introductory notebooks. This tutorial is partially based on the SAS thread [How to evaluate and test pile-up in an EPIC source](https://www.cosmos.esa.int/web/xmm-newton/sas-thread-epatplot).
 
 We will be using a bright x-ray source (the star Algol) to demonstrate the pile-up effect. We will not be filtering the data, as demonstrated in previous notebooks, but will be using the unfiltered event list. Normally you should filter your data first and produce a Good Time Interval (GTI) file.
 
@@ -73,12 +73,18 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
 </div>
 
 
-## Basic Setup
+## 2. Basic Setup
 
 ```python
+import git
+repo = git.Repo('/home/idies/miniforge3/envs/xmmsas/lib/python3.11/site-packages/pysas')
+repo.git.checkout('pysasv2')
+```
+
+```python editable=true slideshow={"slide_type": ""}
 # pySAS imports
 import pysas
-from pysas.wrapper import Wrapper as w
+from pysas.sastask import MyTask
 
 # Importing Js9
 import jpyjs9
@@ -104,37 +110,39 @@ from SciServer import Authentication as auth
 usr = auth.getKeystoneUserWithToken(auth.getToken()).userName
 
 data_dir = os.path.join('/home/idies/workspace/Temporary/',usr,'scratch/xmm_data')
-odf = pysas.odfcontrol.ODFobject(obsid)
-odf.basic_setup(data_dir=data_dir,overwrite=False,repo='sciserver',rerun=False,
-                run_epproc=False,run_rgsproc=False)
-os.chdir(odf.work_dir)
+my_obs = pysas.obsid.ObsID(obsid,data_dir=data_dir)
+
+my_obs.basic_setup(overwrite=False,repo='sciserver',rerun=False,
+                   run_epproc=False,run_rgsproc=False)
+
+os.chdir(my_obs.work_dir)
 ```
 
 ```python
 # File names for this notebook. The User can change these file names.
-unfiltered_event_list = odf.files['M1evt_list'][0]
+unfiltered_event_list = my_obs.files['M1evt_list'][0]
 light_curve_file = 'ltcrv.fits'
 circle_selection = 'circle_selection_event_list.fits'
 ring_selction1 = 'ring_selection1_event_list.fits'
 ring_selction2 = 'ring_selection2_event_list.fits'
-circle_epat = 'circle_epat.ps'
-ring1_epat = 'ring1_epat.ps'
-ring2_epat = 'ring2_epat.ps'
+circle_epat = 'circle_epat.pdf'
+ring1_epat = 'ring1_epat.pdf'
+ring2_epat = 'ring2_epat.pdf'
 ```
 
 ```python
 def display_fits_image(event_list_file, image_file='image.fits'):
-    
-    inargs = ['table={0}'.format(event_list_file), 
-              'withimageset=yes',
-              'imageset={0}'.format(image_file), 
-              'xcolumn=X', 
-              'ycolumn=Y', 
-              'imagebinning=imageSize', 
-              'ximagesize=600', 
-              'yimagesize=600']
 
-    w('evselect', inargs).run()
+    inargs = {'table'        : event_list_file, 
+              'withimageset' : 'yes',
+              'imageset'     : image_file, 
+              'xcolumn'      : 'X', 
+              'ycolumn'      : 'Y', 
+              'imagebinning' : 'imageSize', 
+              'ximagesize'   : '600', 
+              'yimagesize'   : '600'}
+
+    MyTask('evselect', inargs).run()
 
     with fits.open(image_file) as hdu:
         my_js9.SetFITS(hdu)
@@ -142,26 +150,6 @@ def display_fits_image(event_list_file, image_file='image.fits'):
         my_js9.SetScale("log")
     
     return image_file
-```
-
-```python
-def plot_light_curve(event_list_file, light_curve_file='ltcrv.fits'):
-                     
-    inargs = ['table={0}'.format(event_list_file), 
-              'withrateset=yes', 
-              'rateset={0}'.format(light_curve_file), 
-              'maketimecolumn=yes', 
-              'timecolumn=TIME', 
-              'timebinsize=100', 
-              'makeratecolumn=yes']
-
-    w('evselect', inargs).run()
-
-    ts = Table.read(light_curve_file,hdu=1)
-    plt.plot(ts['TIME'],ts['RATE'])
-    plt.xlabel('Time (s)')
-    plt.ylabel('Count Rate (ct/s)')
-    plt.show()
 ```
 
 ```python
@@ -180,14 +168,14 @@ def filter_region(input_event_list,output_event_list,x,y,radius,type='circle'):
         source_loc = source_region['lcs']
         expression = "'((X,Y) in ANNULUS({x:.1f},{y:.1f},{radiusi:.1f},{radiuso:.1f}))'".format(x=source_loc['x'],y=source_loc['y'],radiusi=source_loc['radii'][0],radiuso=source_loc['radii'][1])
     
-    inargs = {'table' : input_event_list,
-              'withfilteredset' : 'yes',
-              'filteredset' : output_event_list,
+    inargs = {'table'            : input_event_list,
+              'withfilteredset'  : 'yes',
+              'filteredset'      : output_event_list,
               'keepfilteroutput' : 'yes',
-              'filtertype': 'expression',
-              'expression': expression}
+              'filtertype'       : 'expression',
+              'expression'       : expression}
     
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 ```
 
 ```python
@@ -197,31 +185,30 @@ display_fits_image(unfiltered_event_list)
 This following cell is not necessary for what we are doing here, but is good to check that the data for this observation is generally free from flares and other contamination.
 
 ```python
-plot_light_curve(unfiltered_event_list, light_curve_file=light_curve_file)
+my_obs.quick_lcplot(unfiltered_event_list, light_curve_file=light_curve_file)
 ```
 
-## Using `epatplot` to check for pile-up
+## 3. Using `epatplot` to check for pile-up
 
-The output of `epatplot` is a postscript file, which may be viewed with a postscript viewer such as `gv` (i.e. 'ghostscript viewer'). At the moment there is no way to view a postscript file on SciServer so to view it you will have to download the postscript file to your local machine to view it. If you do not have `gv` installed on your local machine, install it from a terminal using `sudo apt install gv`. Then from the download directory you can run `gv file_name.ps` (with `file_name` being the name of the file) to view the graphs.
+The output of `epatplot` is a pdf. To view it you need to use the navigation pane to the left and navigate to the `work_dir` for this Obs ID. After it has been created you can then double click on the pfd file to view it. As a reminder, all files created here can be found in the work directory for this Obs ID.
+
+```python
+print(my_obs.work_dir)
+```
 
 First we will use a circle region to select the source. The (x,y) coordinates of the source have been determined before hand.
 
-The following cell will extract the events inside the region using `evselect`, and write those events to a file `circle_selection_event_list.fits`. Then it will use `epatplot` to create the diagnostic plot `circle_epat.ps`.
-
-As a reminder, all files created here can be found in the work directory for this Obs ID.
-
-```python
-print(odf.work_dir)
-```
+The following cell will extract the events inside the region using `evselect`, and write those events to a file `circle_selection_event_list.fits`. Then it will use `epatplot` to create the diagnostic plot `circle_epat.pdf`.
 
 ```python
 filter_region(unfiltered_event_list,circle_selection,27536,27362,10,type='circle')
-inargs = ['set={0}'.format(circle_selection),
-          'plotfile={0}'.format(circle_epat),
-          'useplotfile=yes',
-          "pileupnumberenergyrange='1000 5000'"]
 
-w('epatplot', inargs).run()
+inargs = {'set'         : circle_selection,
+          'plotfile'    : circle_epat,
+          'useplotfile' : 'yes',
+          'pileupnumberenergyrange' : "'1000 5000'"}
+
+MyTask('epatplot', inargs).run()
 ```
 
 The resulting plot should look like this:
@@ -236,12 +223,13 @@ To address the pile-up, instead of using a circular region we will use and annul
 
 ```python
 filter_region(unfiltered_event_list,ring_selction1,27536,27362,[2,10],type='annulus')
-inargs = ['set={0}'.format(ring_selction1),
-          'plotfile={0}'.format(ring1_epat),
-          'useplotfile=yes',
-          "pileupnumberenergyrange='1000 5000'"]
 
-w('epatplot', inargs).run()
+inargs = {'set'         : ring_selction1,
+          'plotfile'    : ring1_epat,
+          'useplotfile' : 'yes',
+          'pileupnumberenergyrange' : "'1000 5000'"}
+
+MyTask('epatplot', inargs).run()
 ```
 
 The resulting plot should look like this:
@@ -253,12 +241,13 @@ While the data is closer to the model, there is still a difference. We can impro
 
 ```python
 filter_region(unfiltered_event_list,ring_selction2,27536,27362,[4,10],type='annulus')
-inargs = ['set={0}'.format(ring_selction2),
-          'plotfile={0}'.format(ring2_epat),
-          'useplotfile=yes',
-          "pileupnumberenergyrange='1000 5000'"]
 
-w('epatplot', inargs).run()
+inargs = {'set' : ring_selction2,
+          'plotfile' : ring2_epat,
+          'useplotfile' : 'yes',
+          'pileupnumberenergyrange' : "'1000 5000'"}
+
+MyTask('epatplot', inargs).run()
 ```
 
 The resulting plot should look like this:
@@ -266,4 +255,4 @@ The resulting plot should look like this:
 <center><img src="_files/ring2_pile_up.png"/></center>
 
 
-The data now closely matches the model and pile-up has been sucsessfully minimized. The final filtered event list, `ring_selection2_event_list.fits`, can now be used to extract a spectrum as shown in [Part 2 tutorial](./analysis-xmm-ABC-guide-ch6-p2.ipynb) on filtering and extracting a spectrum.
+The data now closely matches the model and pile-up has been sucsessfully minimized. The final filtered event list, `ring_selection2_event_list.fits`, can now be used to extract a spectrum as shown in [ABC Guide Chapter 6, Part 2 tutorial](./analysis-xmm-ABC-guide-ch6-p2.md) on filtering and extracting a spectrum.

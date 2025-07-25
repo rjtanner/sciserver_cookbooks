@@ -12,22 +12,23 @@ jupyter:
     name: conda-env-xmmsas-py
 ---
 
-# ABC Guide for XMM-Newton -- Part 2
+<!-- #region editable=true slideshow={"slide_type": ""} -->
+# ABC Guide for XMM-Newton -- EPIC Source Extraction and Spectrum Creation
 <hr style="border: 2px solid #fadbac" />
 
-- **Description:** XMM-Newton ABC Guide, Chapter 6, Part 2.
+- **Description:** XMM-Newton ABC Guide, EPIC Source Extraction and Spectrum Creation.
 - **Level:** Beginner
 - **Data:** XMM observation of the Lockman Hole (obsid=0123700101)
-- **Requirements:** Must be run using the `HEASARCv6.35` image.  Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
+- **Requirements:** Must be run using the `HEASARCv6.35` (or higher) image, along with pySAS version 2.0.  Run in the <tt>(xmmsas)</tt> conda environment on Sciserver. You should see <tt>(xmmsas)</tt> at the top right of the notebook. If not, click there and select <tt>(xmmsas)</tt>.
 - **Credit:** Ryan Tanner (April 2024)
 - **Support:** <a href="https://heasarc.gsfc.nasa.gov/docs/xmm/xmm_helpdesk.html">XMM Newton GOF Helpdesk</a>
-- **Last verified to run:** 26 March 2025, for SAS v22.1 and pySAS v1.4.8
+- **Last verified to run:** 21 July 2025, for SAS v22.1 and pySAS v2.0
 
 <hr style="border: 2px solid #fadbac" />
+<!-- #endregion -->
 
-
-## Introduction
-This tutorial is based on Chapter 6 from the The XMM-Newton ABC Guide prepared by the NASA/GSFC XMM-Newton Guest Observer Facility. This notebook assumes you are at least minimally familiar with pySAS on SciServer (see the [Long pySAS Introduction](./analysis-xmm-long-intro.md "Long pySAS Intro")). 
+## 1. Introduction
+This tutorial is based on Chapter 7 from [The XMM-Newton ABC Guide](https://heasarc.gsfc.nasa.gov/docs/xmm/abc/ "ABC Guide") prepared by the NASA/GSFC XMM-Newton Guest Observer Facility. This notebook assumes you are at least minimally familiar with pySAS on SciServer (see the [Long pySAS Introduction](./analysis-xmm-long-intro.md "Long pySAS Intro")), and that you have previously worked through the notebook on [EPIC image creation and basic filtering](./analysis-xmm-ABC-guide-EPIC-image-filtering.md).
 
 #### SAS Tasks to be Used
 
@@ -63,10 +64,11 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
 ```python editable=true slideshow={"slide_type": ""}
 # pySAS imports
 import pysas
-from pysas.wrapper import Wrapper as w
+from pysas.sastask import MyTask
 
 # Importing Js9
 import jpyjs9
+my_js9 = jpyjs9.JS9(width = 800, height = 800, side=True)
 
 # Useful imports
 import os, subprocess
@@ -80,13 +82,7 @@ from astropy.table import Table
 plt.style.use(astropy_mpl_style)
 ```
 
-<!-- #region -->
-Now we need to let pySAS know which Obs ID we are working with. As with Part 1 for demonstration purposes we will use the pipeline processed event list. If you downloaded the uncalibrated data files in Part 1 then if you run 
-```python
-odf.basic_setup(data_dir=data_dir,overwrite=False,repo='sciserver',rerun=False)
-```
-it will auto-detect the observation files and event lists created in Part 1.
-<!-- #endregion -->
+Now we need to let pySAS know which Obs ID we are working with. When we run the command `basic_setup` it will auto-detect the observation files and event lists created in the notebook on [EPIC image creation and basic filtering](./analysis-xmm-ABC-guide-EPIC-image-filtering.md).
 
 ```python
 obsid = '0123700101'
@@ -96,14 +92,14 @@ from SciServer import Authentication as auth
 usr = auth.getKeystoneUserWithToken(auth.getToken()).userName
 
 data_dir = os.path.join('/home/idies/workspace/Temporary/',usr,'scratch/xmm_data')
-odf = pysas.odfcontrol.ODFobject(obsid)
+my_obs = pysas.obsid.ObsID(obsid,data_dir=data_dir)
 
-odf.basic_setup(data_dir=data_dir,overwrite=False,repo='sciserver',
-                run_epproc=False,rerun=False,run_rgsproc=False)
-os.chdir(odf.work_dir)
+my_obs.basic_setup(overwrite=False,repo='sciserver',rerun=False,
+                   run_epproc=False,run_rgsproc=False)
+os.chdir(my_obs.work_dir)
 
 # File names for this notebook. The User can change these file names.
-unfiltered_event_list = odf.files['M1evt_list'][0]
+unfiltered_event_list = my_obs.files['M1evt_list'][0]
 temporary_event_list = 'temporary_event_list.fits'
 light_curve_file ='mos1_ltcrv.fits'
 gti_rate_file = 'gti_rate.fits'
@@ -112,77 +108,75 @@ filtered_event_list = 'filtered_event_list.fits'
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
 ---
-If you have already worked through Part 1 of this tutorial you can skip the next cell. But if not, or if you want to run it again, the necessary code from Part 1 is in the cell below.
+If you have already worked through the notebook tutorial on [EPIC image creation and basic filtering](./analysis-xmm-ABC-guide-EPIC-image-filtering.md) you can skip the next cell. But if not, or if you want to run it again, the necessary code from that notebook is in the cell below.
 <!-- #endregion -->
 
 ```python
 # "Standard" Filter
-inargs = ['table={0}'.format(unfiltered_event_list), 
-          'withfilteredset=yes', 
-          "expression='(PATTERN <= 12)&&(PI in [200:4000])&&#XMMEA_EM'", 
-          'filteredset={0}'.format(temporary_event_list), 
-          'filtertype=expression', 
-          'keepfilteroutput=yes', 
-          'updateexposure=yes', 
-          'filterexposure=yes']
+inargs = {'table'           : unfiltered_event_list, 
+          'withfilteredset' : 'yes', 
+          "expression"      : "'(PATTERN <= 12)&&(PI in [200:4000])&&#XMMEA_EM'", 
+          'filteredset'     : temporary_event_list, 
+          'filtertype'      : 'expression', 
+          'keepfilteroutput': 'yes', 
+          'updateexposure'  : 'yes', 
+          'filterexposure'  : 'yes'}
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 
 # Make Light Curve File
-inargs = ['table={0}'.format(temporary_event_list), 
-          'withrateset=yes', 
-          'rateset={0}'.format(light_curve_file), 
-          'maketimecolumn=yes', 
-          'timecolumn=TIME', 
-          'timebinsize=100', 
-          'makeratecolumn=yes']
+inargs = {'table'          : temporary_event_list, 
+          'withrateset'    : 'yes', 
+          'rateset'        : light_curve_file, 
+          'maketimecolumn' : 'yes', 
+          'timecolumn'     : 'TIME', 
+          'timebinsize'    : '100', 
+          'makeratecolumn' : 'yes'}
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 
 # Make Secondary GTI File
-inargs = ['table={0}'.format(light_curve_file), 
-          'gtiset={0}'.format(gti_rate_file),
-          'timecolumn=TIME', 
-          "expression='(RATE <= 6)'"]
+# Chose the rate based on the plot from the light curve file
+filter_rate = 6
+inargs = {'table'      : light_curve_file, 
+          'gtiset'     : gti_rate_file,
+          'timecolumn' : 'TIME', 
+          "expression" : "'(RATE <= {0})'".format(filter_rate)}
 
-w('tabgtigen', inargs).run()
+MyTask('tabgtigen', inargs).run()
 
 # Filter Using Secondary GTI File
-inargs = ['table={0}'.format(temporary_event_list),
-          'withfilteredset=yes', 
-          "expression='GTI({0},TIME)'".format(gti_rate_file), 
-          'filteredset={0}'.format(filtered_event_list),
-          'filtertype=expression', 
-          'keepfilteroutput=yes',
-          'updateexposure=yes', 
-          'filterexposure=yes']
+inargs = {'table'           : temporary_event_list,
+          'withfilteredset' : 'yes', 
+          "expression"      : "'GTI({0},TIME)'".format(gti_rate_file), 
+          'filteredset'     : filtered_event_list,
+          'filtertype'      : 'expression', 
+          'keepfilteroutput': 'yes',
+          'updateexposure'  : 'yes', 
+          'filterexposure'  : 'yes'}
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 ```
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
-## 6.6 Regions in JS9
+## 2. Regions in JS9
 <!-- #endregion -->
 
-As in Part 1, we will use a function to create a FITS image file from the filtered event list and open it in JS9. Let us open a JS9 window again.
-
-```python
-my_js9 = jpyjs9.JS9(width = 800, height = 800, side=True)
-```
+As in the notebook on [EPIC image creation and basic filtering](./analysis-xmm-ABC-guide-EPIC-image-filtering.md), we will use a function to create a FITS image file from the filtered event list and open it in JS9.
 
 ```python
 def make_fits_image(event_list_file, image_file='image.fits'):
     
-    inargs = ['table={0}'.format(event_list_file), 
-              'withimageset=yes',
-              'imageset={0}'.format(image_file), 
-              'xcolumn=X', 
-              'ycolumn=Y', 
-              'imagebinning=imageSize', 
-              'ximagesize=600', 
-              'yimagesize=600']
+    inargs = {'table'        : event_list_file, 
+              'withimageset' : 'yes',
+              'imageset'     : image_file, 
+              'xcolumn'      : 'X', 
+              'ycolumn'      : 'Y', 
+              'imagebinning' : 'imageSize', 
+              'ximagesize'   : '600', 
+              'yimagesize'   : '600'}
 
-    w('evselect', inargs).run()
+    MyTask('evselect', inargs).run()
 
     with fits.open(image_file) as hdu:
         my_js9.SetFITS(hdu)
@@ -246,7 +240,7 @@ new_zoom = current_zoom * 4
 my_js9.SetZoom(new_zoom)
 ```
 
-## 6.7 Extract the Source and Background Spectra for a Single Region
+## 3. Extract the Source and Background Spectra for a Single Region
 
 
 Throughout the following, please keep in mind that some parameters are instrument-dependent. The parameter `specchannelmax` should be set to 11999 for the MOS, or 20479 for the PN. Also, for the PN, the most stringent filters, `(FLAG==0)&&(PATTERN<=4)`, must be included in the expression to get a high-quality spectrum.
@@ -283,37 +277,37 @@ filtered_bkg = 'bkg_filtered.fits'
 source_spectra_file = 'mos1_pi.fits'
 bkg_spectra_file = 'bkg_pi.fits'
 
-inargs = {'table': filtered_event_list,
-          'energycolumn': 'PI',
-          'withfilteredset': 'yes',
-          'filteredset': filtered_source,
+inargs = {'table'           : filtered_event_list,
+          'energycolumn'    : 'PI',
+          'withfilteredset' : 'yes',
+          'filteredset'     : filtered_source,
           'keepfilteroutput': 'yes',
-          'filtertype': 'expression',
-          'expression': "'((X,Y) in CIRCLE(26188.5,22816.5,300))'",
-          'withspectrumset': 'yes',
-          'spectrumset': source_spectra_file,
-          'spectralbinsize': '5',
-          'withspecranges': 'yes',
-          'specchannelmin': '0',
-          'specchannelmax': '11999'}
+          'filtertype'      : 'expression',
+          'expression'      : "'((X,Y) in CIRCLE(26188.5,22816.5,300))'",
+          'withspectrumset' : 'yes',
+          'spectrumset'     : source_spectra_file,
+          'spectralbinsize' : '5',
+          'withspecranges'  : 'yes',
+          'specchannelmin'  : '0',
+          'specchannelmax'  : '11999'}
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 
-inargs = {'table': filtered_event_list,
-          'energycolumn': 'PI',
-          'withfilteredset': 'yes',
-          'filteredset': filtered_bkg,
+inargs = {'table'           : filtered_event_list,
+          'energycolumn'    : 'PI',
+          'withfilteredset' : 'yes',
+          'filteredset'     : filtered_bkg,
           'keepfilteroutput': 'yes',
-          'filtertype': 'expression',
-          'expression': "'((X,Y) in CIRCLE(26188.5,22816.5,1500))&&!((X,Y) in CIRCLE(26188.5,22816.5,500))'",
-          'withspectrumset': 'yes',
-          'spectrumset': bkg_spectra_file,
-          'spectralbinsize': '5',
-          'withspecranges': 'yes',
-          'specchannelmin': '0',
-          'specchannelmax': '11999'}
+          'filtertype'      : 'expression',
+          'expression'      : "'((X,Y) in CIRCLE(26188.5,22816.5,1500))&&!((X,Y) in CIRCLE(26188.5,22816.5,500))'",
+          'withspectrumset' : 'yes',
+          'spectrumset'     : bkg_spectra_file,
+          'spectralbinsize' : '5',
+          'withspecranges'  : 'yes',
+          'specchannelmin'  : '0',
+          'specchannelmax'  : '11999'}
 
-w('evselect', inargs).run()
+MyTask('evselect', inargs).run()
 ```
 
 You might want to automatically generate expressions for your regions using the region information from JS9. Below is some example code on how to automatically generate filtering expressions for both a source and the background.
@@ -331,43 +325,45 @@ bkg_loc = bkg_region['lcs']
 
 ```python
 expression = "'((X,Y) in CIRCLE({x:.1f},{y:.1f},{radius:.1f}))'".format(x=source_loc['x'],y=source_loc['y'],radius=source_loc['radius'])
-inargs = {'table': filtered_event_list,
-          'energycolumn': 'PI',
-          'withfilteredset': 'yes',
-          'filteredset': filtered_source,
-          'keepfilteroutput': 'yes',
-          'filtertype': 'expression',
-          'expression': expression,
-          'withspectrumset': 'yes',
-          'spectrumset': source_spectra_file,
-          'spectralbinsize': '5',
-          'withspecranges': 'yes',
-          'specchannelmin': '0',
-          'specchannelmax': '11999'}
 
-w('evselect', inargs).run()
+inargs = {'table'           : filtered_event_list,
+          'energycolumn'    : 'PI',
+          'withfilteredset' : 'yes',
+          'filteredset'     : filtered_source,
+          'keepfilteroutput': 'yes',
+          'filtertype'      : 'expression',
+          'expression'      : expression,
+          'withspectrumset' : 'yes',
+          'spectrumset'     : source_spectra_file,
+          'spectralbinsize' : '5',
+          'withspecranges'  : 'yes',
+          'specchannelmin'  : '0',
+          'specchannelmax'  : '11999'}
+
+MyTask('evselect', inargs).run()
 ```
 
 ```python
 expression = "((X,Y) in CIRCLE({x:.1f},{y:.1f},{radiuso:.1f}))&&!((X,Y) in CIRCLE({x:.1f},{y:.1f},{radiusi:.1f}))".format(x=bkg_loc['x'],y=bkg_loc['y'],radiuso=bkg_loc['radii'][1],radiusi=bkg_loc['radii'][0])
-inargs = {'table': filtered_event_list,
-          'energycolumn': 'PI',
-          'withfilteredset': 'yes',
-          'filteredset': filtered_bkg,
-          'keepfilteroutput': 'yes',
-          'filtertype': 'expression',
-          'expression': expression,
-          'withspectrumset': 'yes',
-          'spectrumset': bkg_spectra_file,
-          'spectralbinsize': '5',
-          'withspecranges': 'yes',
-          'specchannelmin': '0',
-          'specchannelmax': '11999'}
 
-w('evselect', inargs).run()
+inargs = {'table'            : filtered_event_list,
+          'energycolumn'     : 'PI',
+          'withfilteredset'  : 'yes',
+          'filteredset'      : filtered_bkg,
+          'keepfilteroutput' : 'yes',
+          'filtertype'       : 'expression',
+          'expression'       : expression,
+          'withspectrumset'  : 'yes',
+          'spectrumset'      : bkg_spectra_file,
+          'spectralbinsize'  : '5',
+          'withspecranges'   : 'yes',
+          'specchannelmin'   : '0',
+          'specchannelmax'   : '11999'}
+
+MyTask('evselect', inargs).run()
 ```
 
-## 6.8 Check for Pile Up
+## 4. Check for Pile Up
 
 
 Depending on how bright the source is and what modes the EPIC detectors are in, event pile up may be a problem. Pile up occurs when a source is so bright that incoming X-rays strike two neighboring pixels or the same pixel in the CCD more than once in a read-out cycle. In such cases the energies of the two events are in effect added together to form one event. If this happens sufficiently often, 
@@ -383,13 +379,13 @@ To check whether pile up may be a problem, use the SAS task epatplot. Heavily pi
 To check for pile up in our Lockman Hole example, run the following cell:
 
 ```python
-inargs = ['set={0}'.format(filtered_source),
-          'plotfile=mos1_epat.ps',
-          'useplotfile=yes',
-          'withbackgroundset=yes',
-          'backgroundset={0}'.format(filtered_bkg)]
+inargs = {'set'               : filtered_source,
+          'plotfile'          : 'mos1_epat.pdf',
+          'useplotfile'       : 'yes',
+          'withbackgroundset' : 'yes',
+          'backgroundset'     : filtered_bkg}
 
-w('epatplot', inargs).run()
+MyTask('epatplot', inargs).run()
 ```
 
 where
@@ -400,8 +396,11 @@ where
     withbackgroundset - use background event set for background subtraction? 
     backgroundset - name of background event file
 
-The output of `epatplot` is a postscript file, `mos1_epat.ps`, which may be viewed with a postscript viewer such as `gv` (i.e. 'ghostscript viewer'). At the moment there is no way to view a postscript file on SciServer so to view it you will have to download `mos1_epat.ps` to your local machine to view it. If you do not have `gv` installed on your local machine, install it from a terminal using `sudo apt install gv`. Then from the download directory you can run `gv mos1_epat.ps` to view the graphs. In the postscript image there are two graphs describing the distribution of counts as a function of PI channel. You should get a plot like that shown below.
+The output of `epatplot` is a pdf file, `mos1_epat.pdf` and is found in the `work_dir` for the Obs ID we are using. In the pdf there are two graphs describing the distribution of counts as a function of PI channel. You should get a plot like that shown below.
 
+```python
+print(my_obs.work_dir)
+```
 
 <center><img src="_files/pile_up_plot1.png"/></center>
 
@@ -418,7 +417,7 @@ The source used in our Lockman Hole example is too faint to provide reasonable s
 <center><img src="_files/pile_up_Mkn_421.png"/></center>
 
 
-## 6.9 My Observation is Piled Up! Now What?
+## 5. My Observation is Piled Up! Now What?
 
 
 If you're working with a different (much brighter) dataset that does show signs of pile up, there are a few ways to deal with it. First, using the region selection and event file filtering procedures demonstrated in earlier sections, you can excise the inner-most regions of a source (as they are the most heavily piled up), re-extract the spectrum, and continue your analysis on the excised event file. For this procedure, it is recommended that you take an iterative approach: remove an inner region, extract a spectrum, check with epatplot, and repeat, each time removing a slightly larger region, until the model and observed distribution functions agree. If you do this, be aware that removing too small a region with respect to the instrumental pixel size (1.1'' for the MOS, 4.1'' for the PN) can introduce systematic inaccuracies when calculating the source flux; these are less than 4%, and decrease to less than 1% when the excised region is more than 5 times the instrumental pixel half-size. In any case, be certain that the excised region is larger than the instrumental pixel size!
@@ -426,7 +425,7 @@ If you're working with a different (much brighter) dataset that does show signs 
 You can also use the event file filtering procedures to include only single pixel events (PATTERN==0), as these events are less sensitive to pile up than other patterns.
 
 
-## 6.10 Determine the Spectrum Extraction Areas
+## 6. Determine the Spectrum Extraction Areas
 
 
 Now that we are confident that our spectrum is not piled up, we can continue by finding the source and background region areas. This is done with the task `backscale`, which takes into account any bad pixels or chip gaps, and writes the result into the BACKSCAL keyword of the spectrum table. Alternatively, we can skip running backscale, and use a keyword in arfgen below. We will show both options for the curious.
@@ -439,18 +438,18 @@ The inputs for `backscale` are:
 To find the source and background extraction areas explicitly,
 
 ```python
-inargs = ['spectrumset={0}'.format(source_spectra_file),
-          'badpixlocation={0}'.format(filtered_event_list)]
+inargs = {'spectrumset'    : source_spectra_file,
+          'badpixlocation' : filtered_event_list}
 
-w('backscale', inargs).run()
+MyTask('backscale', inargs).run()
 
-inargs = ['spectrumset={0}'.format(bkg_spectra_file),
-          'badpixlocation={0}'.format(filtered_event_list)]
+inargs = {'spectrumset'    : bkg_spectra_file,
+          'badpixlocation' : filtered_event_list}
 
-w('backscale', inargs).run()
+MyTask('backscale', inargs).run()
 ```
 
-## 6.11 Create the Photon Redistribution Matrix (RMF) and Ancillary File (ARF)
+## 7. Create the Photon Redistribution Matrix (RMF) and Ancillary File (ARF)
 
 
 Now that a source spectrum has been extracted, we need to reformat the detector response by making a redistribution matrix file (RMF) and ancillary response file (ARF). To make the RMF we use `rmfgen`. The input arguments are:
@@ -473,21 +472,21 @@ rmf_file = 'mos1_rmf.fits'
 arf_file = 'mos1_arf.fits'
 
 inargs = {}
-inargs = {'rmfset': rmf_file,
-          'spectrumset': source_spectra_file}
+inargs = {'rmfset'      : rmf_file,
+          'spectrumset' : source_spectra_file}
 
-w('rmfgen', inargs).run()
+MyTask('rmfgen', inargs).run()
 
 inargs = {}
-inargs = {'arfset': arf_file,
-          'spectrumset': source_spectra_file,
-          'withrmfset': 'yes',
-          'rmfset': rmf_file,
-          'withbadpixcorr': 'yes',
-          'badpixlocation': filtered_event_list,
-          'setbackscale': 'yes'}
+inargs = {'arfset'         : arf_file,
+          'spectrumset'    : source_spectra_file,
+          'withrmfset'     : 'yes',
+          'rmfset'         : rmf_file,
+          'withbadpixcorr' : 'yes',
+          'badpixlocation' : filtered_event_list,
+          'setbackscale'   : 'yes'}
 
-w('arfgen', inargs).run()
+MyTask('arfgen', inargs).run()
 ```
 
 To analize the spectra the individual photon counts need to be grouped into energy bins. We also need to include the filenames of the ARF, RMF, and background spectra in the header of the grouped spectra file. We do this by using the `specgroup` command. The input arguments are:
@@ -503,14 +502,14 @@ To analize the spectra the individual photon counts need to be grouped into ener
 grouped_spectra = 'mos1_grp.fits'
 
 inargs = {}
-inargs = {'spectrumset': source_spectra_file,
-          'groupedset': grouped_spectra,
-          'arfset': arf_file,
-          'rmfset': rmf_file,
-          'backgndset': bkg_spectra_file,
-          'mincounts': '30'}
+inargs = {'spectrumset' : source_spectra_file,
+          'groupedset'  : grouped_spectra,
+          'arfset'      : arf_file,
+          'rmfset'      : rmf_file,
+          'backgndset'  : bkg_spectra_file,
+          'mincounts'   : 30}
 
-w('specgroup', inargs).run()
+MyTask('specgroup', inargs).run()
 ```
 
-At this point, the spectrum stored in the file `mos1_grp.fits` is ready to be analyzed using an analysis package such as XSPEC. For a simple example of that see the notebook [Fitting an EPIC Spectrum in XSPEC](./analysis-xmm-ABC-guide-spectra-fitting.ipynb) based on Chapter 13 of the ABC Guide.
+At this point, the spectrum stored in the file `mos1_grp.fits` is ready to be analyzed using an analysis package such as XSPEC. For a simple example of that see the notebook [Fitting an EPIC Spectrum in XSPEC](./analysis-xmm-ABC-guide-spectra-fitting.md) based on Chapter 13 of the ABC Guide.
