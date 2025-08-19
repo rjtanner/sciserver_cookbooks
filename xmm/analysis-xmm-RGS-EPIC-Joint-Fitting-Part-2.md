@@ -46,6 +46,11 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
 
 ## 2. Setup
 
+```python
+# Make sure pySAS is up to date
+%pip install xmmpysas --upgrade
+```
+
 ```python editable=true slideshow={"slide_type": ""}
 import xspec
 import os

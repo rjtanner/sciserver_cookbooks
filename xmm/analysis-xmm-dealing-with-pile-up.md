@@ -76,9 +76,8 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
 ## 2. Basic Setup
 
 ```python
-import git
-repo = git.Repo('/home/idies/miniforge3/envs/xmmsas/lib/python3.11/site-packages/pysas')
-repo.git.checkout('pysasv2')
+# Make sure pySAS is up to date
+%pip install xmmpysas --upgrade
 ```
 
 ```python editable=true slideshow={"slide_type": ""}

@@ -7,9 +7,9 @@ jupyter:
       format_version: '1.3'
       jupytext_version: 1.16.0
   kernelspec:
-    display_name: (xmmsas)
+    display_name: (heasoft)
     language: python
-    name: conda-env-xmmsas-py
+    name: conda-env-heasoft-py
 ---
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
@@ -82,6 +82,11 @@ For the second question, you will also have to choose a directory for your data 
 For the third question, a working directory will automatically be created for each ObsID, as explained below. You can change this manually, but using the default is recommended.
 ___
 <!-- #endregion -->
+
+```python
+# Make sure pySAS is up to date
+%pip install xmmpysas --upgrade
+```
 
 ```python
 import os

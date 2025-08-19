@@ -63,6 +63,11 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
     <b>Warning:</b> By default this notebook will place observation data files in your <tt>scratch</tt> space. The <tt>scratch</tt> space on SciServer will only retain files for 90 days. If you wish to keep the data files for longer move them into your <tt>persistent</tt> directory.
 </div>
 
+```python
+# Make sure pySAS is up to date
+%pip install xmmpysas --upgrade
+```
+
 ```python editable=true slideshow={"slide_type": ""}
 # pySAS imports
 import pysas

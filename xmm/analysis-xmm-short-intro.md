@@ -7,9 +7,9 @@ jupyter:
       format_version: '1.3'
       jupytext_version: 1.16.0
   kernelspec:
-    display_name: (xmmsas)
+    display_name: (heasoft)
     language: python
-    name: conda-env-xmmsas-py
+    name: conda-env-heasoft-py
 ---
 
 # pySAS Introduction -- Short Version
@@ -48,6 +48,11 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
 
 
 ## 2. Import pySAS and Set `obsid`
+
+```python
+# Make sure pySAS is up to date
+%pip install xmmpysas --upgrade
+```
 
 ```python editable=true slideshow={"slide_type": ""}
 import os

@@ -7,9 +7,9 @@ jupyter:
       format_version: '1.3'
       jupytext_version: 1.16.0
   kernelspec:
-    display_name: (heasoft)
+    display_name: (xmmsas)
     language: python
-    name: conda-env-heasoft-py
+    name: conda-env-xmmsas-py
 ---
 
 # How to reprocess ODFs to generate calibrated and concatenated EPIC event lists
@@ -77,6 +77,11 @@ The files produced by [epproc](https://xmm-tools.cosmos.esa.int/external/sas/cur
     
 The files produced by [emproc](https://xmm-tools.cosmos.esa.int/external/sas/current/doc/emproc/index.html) are conceptually the same. The main difference in the naming convention is that the string `EPN` is replaced by `EMOS1` and `EMOS2` for each EPIC-MOS camera, respectively.
 ___
+
+```python
+# Make sure pySAS is up to date
+%pip install xmmpysas --upgrade
+```
 
 ```python
 # pySAS imports

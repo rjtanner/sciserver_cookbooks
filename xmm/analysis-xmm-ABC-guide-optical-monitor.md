@@ -92,6 +92,11 @@ Further, artifacts also can contaminate grism data. Due to this mode's complexit
 ### 4.1 Rerunning the Pipeline
 
 ```python
+# Make sure pySAS is up to date
+%pip install xmmpysas --upgrade
+```
+
+```python
 # pySAS imports
 import pysas
 from pysas.wrapper import Wrapper as w

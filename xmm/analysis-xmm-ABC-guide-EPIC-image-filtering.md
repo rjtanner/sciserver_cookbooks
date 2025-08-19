@@ -64,6 +64,11 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
 ## 2. Rerun basic processing
 
 ```python
+# Make sure pySAS is up to date
+%pip install xmmpysas --upgrade
+```
+
+```python
 # pySAS imports
 import pysas
 from pysas.sastask import MyTask

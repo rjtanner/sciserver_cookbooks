@@ -64,6 +64,11 @@ This notebook was designed to run on SciServer, but an equivelent notebook can b
 
 ## 2. Setup
 
+```python
+# Make sure pySAS is up to date
+%pip install xmmpysas --upgrade
+```
+
 ```python editable=true slideshow={"slide_type": ""}
 # pySAS imports
 import pysas
@@ -120,7 +125,7 @@ eml_list_file = 'emllist.fits'
 
 ## 3. Filter the Observation
 
-The following filtering follows exactly the filtering done in the ABC Guide Chapter 7, [Part 1](./analysis-xmm-ABC-guide-ch6-p1.md).
+The following filtering follows exactly the filtering done in the ABC Guide [notebook on image creation and filtering](./analysis-xmm-ABC-guide-EPIC-image-filtering.md).
 
 ```python
 def display_fits_image(event_list_file, image_file='image.fits'):
@@ -200,7 +205,7 @@ display_fits_image(filtered_event_list,image_file=filtered_image_file)
 ```
 
 <!-- #region editable=true slideshow={"slide_type": ""} -->
-## 4 .Make a Large Image for Analysis
+## 4. Make a Large Image for Analysis
 
 Above we defined a function `display_fits_image` to generate a FITS image for display purposes. In that function the size of the FITS image was set (`imagebinning=imageSize`, 600x600 pixels) and events in the event list were binned accordingly. While that size of image is fine for quick looks at the data, the resolution is too low for good analysis. Below we define another function, `make_large_image` to make a FITS image, but here we set the bin size (`imagebinning=binSize`, 20x20 arcseconds). Events will be binned accordingly. This creates a much higher resolution image suitable for data analysis.
 
