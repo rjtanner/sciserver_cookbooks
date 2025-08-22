@@ -62,6 +62,7 @@ The following notebook tutorials provide some examples of how to use the softwar
 
   - [XMM Short Introduction](./xmm/analysis-xmm-short-intro.md): A short introduction to using [`pysas`](https://github.com/XMMGOF/pysas) on SciServer.
   - [XMM Long Introduction](./xmm/analysis-xmm-long-intro.md): A longer introduction to using [`pysas`](https://github.com/XMMGOF/pysas) on SciServer.
+  - [pySAS Tips, Tricks, and Features](./xmm/misc-xmm-pysas-demo.md): A brief guide for some tips, tricks, and special features in pySAS.
   - [XMM ABC Guide: Image Creation and Basic Filtering](./xmm/analysis-xmm-ABC-guide-EPIC-image-filtering.md):  A tutorial on how to apply filters to XMM data. Based on [The XMM-Newton ABC Guide](https://heasarc.gsfc.nasa.gov/docs/xmm/abc/ "ABC Guide").
   - [XMM ABC Guide: Source Extraction and Spectrum Creation](./xmm/analysis-xmm-ABC-guide-EPIC-source-spectrum.md): A tutorial on how to extract the spectra of a point source. Based on [The XMM-Newton ABC Guide](https://heasarc.gsfc.nasa.gov/docs/xmm/abc/ "ABC Guide").
   - [XMM ABC Guide: Sprectrum Fitting with pyXSPEC](./xmm/analysis-xmm-ABC-guide-spectra-fitting.md): A tutorial on how to fit EPIC spectra using pyXSPEC.
@@ -69,7 +70,8 @@ The following notebook tutorials provide some examples of how to use the softwar
   - [XMM ABC Guide: Timing Mode](./xmm/analysis-xmm-ABC-guide-timing-mode.md): A tutorial on how to use timing mode data. Based on [The XMM-Newton ABC Guide](https://heasarc.gsfc.nasa.gov/docs/xmm/abc/ "ABC Guide").
   - [XMM EPIC Reprocessing](./xmm/analysis-xmm-epic-reprocessing.md): An introduction to processing data from all three EPIC cameras on XMM.
   - [XMM Optical Monitor](./xmm/analysis-xmm-ABC-guide-optical-monitor.md): A tutorial on how to use data from the Optical Monitor on XMM. Based on [The XMM-Newton ABC Guide](https://heasarc.gsfc.nasa.gov/docs/xmm/abc/ "ABC Guide").
-  - [Automatic Source Detection](./xmm/analysis-xmm-source-detection-p1.md): An example on how to use `edetect_chain` to automatically detect sources.
+  - [Automatic Source Detection, Part 1](./xmm/analysis-xmm-source-detection-p1.md): An example on how to use `edetect_chain` to automatically detect sources.
+  - [Automatic Source Detection, Part 2](./xmm/analysis-xmm-source-detection-p2.md): An example on how to use `edetect_chain` to automatically detect sources.
   - [Dealing With Pile-up](./xmm/analysis-xmm-dealing-with-pile-up.md): A tutorial on how to deal with pile-up for bright EPIC sources.
   - [RGS EPIC Joint Fitting: Part 1](./xmm/analysis-xmm-RGS-EPIC-Joint-Fitting-Part-1.md): A tutorial on how to jointly fit RGS and EPIC spectra using XSPEC, Part 1.
   - [RGS EPIC Joint Fitting: Part 2](./xmm/analysis-xmm-RGS-EPIC-Joint-Fitting-Part-2.md): A tutorial on how to jointly fit RGS and EPIC spectra using XSPEC, Part 2.
@@ -93,4 +95,4 @@ The following notebook tutorials provide some examples of how to use the softwar
 <br />
 
 <hr style="border: 1px solid #fadbac" />
-Last updated: 07/23/2025
+Last updated: 08/23/2025
