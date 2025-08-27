@@ -113,22 +113,49 @@ def display_fits_image(image_file):
 ```
 
 ```python
-def make_hires_image(event_list,pi_min,pi_max,instrument,out_image='image.fits'):
+def filter_event_list(in_event_list,
+                      pi_min,
+                      pi_max,
+                      filtered_event_list):
 
-    if instrument == 'pn':
-        filter = 'XMMEA_EP&&((FLAG & 0x762a097c)==0)'
-        pattern = 4
-    elif 'mos' in instrument:
+    with fits.open(in_event_list) as hdu:
+        instrument = hdu[0].header['INSTRUME']
+
+    if instrument == 'EPN':
+        filter = 'XMMEA_EP'
+        pattern = 0
+    elif 'EMOS' in instrument:
         filter = 'XMMEA_EM'
         pattern = 12
 
     # Filter expression
     expression = '(PATTERN in [0:{pattern}])&&(PI in [{pi_min}:{pi_max}])&&(FLAG == 0)&&#{filter}'.format(filter=filter,pattern=pattern,pi_min=pi_min,pi_max=pi_max)
+
+    inargs = {'table'           : in_event_list, 
+              'withfilteredset' : 'yes', 
+              "expression"      : expression, 
+              'filteredset'     : filtered_event_list, 
+              'filtertype'      : 'expression', 
+              'keepfilteroutput': 'yes', 
+              'updateexposure'  : 'yes', 
+              'filterexposure'  : 'yes'}
     
-    inargs = {'table'         : event_list+':EVENTS', 
+    MyTask('evselect', inargs).run()
+```
+
+```python
+def make_hires_image(in_event_list,
+                     pi_min,
+                     pi_max,
+                     out_image='image.fits'):
+
+    # Filter expression
+    expression = '(PI in [{pi_min}:{pi_max}])'.format(pi_min=pi_min,pi_max=pi_max)
+
+    inargs = {'table'         : in_event_list+':EVENTS', 
               'withimageset'  : 'yes',
+              "expression"    : expression, 
               'imageset'      : out_image,
-              'expression'    : expression,
               'imagebinning'  : 'binSize',
               'xcolumn'       : 'X',
               'ycolumn'       : 'Y',
@@ -171,16 +198,23 @@ for file in event_lists:
     MyTask('espfilt', inargs).run()
 ```
 
+After this we will apply some standard filters to clean up the event lists.
+
 ```python
 cevent_lists = glob.glob('*allevc.fits')
 attitude_file = glob.glob('*AttHk.ds')[0]
+
+pimin = 200
+pimax = 12000
 
 # Putting filenames into a dictionary to make things easier later on
 clean_event_lists = {}
 
 for event_list in cevent_lists:
-    instrument = event_list.replace('-allevc.fits','')[:-4]
-    clean_event_lists[instrument] = event_list
+    with fits.open(event_list) as hdu:
+        instrument = hdu[0].header['INSTRUME']
+    clean_event_lists[instrument] = f'clean_event_list_{instrument}.fits'
+    filter_event_list(event_list,pimin,pimax,clean_event_lists[instrument])
 ```
 
 ## 3. Make High Res Images for Analysis
@@ -206,7 +240,7 @@ for inst in clean_event_lists.keys():
     for i,band in enumerate(energy_bands):
         image_file = inst+'_image_'+band+'.fits'
         band_images[inst].append(image_file)
-        make_hires_image(clean_event_lists[inst],pi_min_list[i],pi_max_list[i],inst,out_image=image_file)
+        make_hires_image(clean_event_lists[inst],pi_min_list[i],pi_max_list[i],out_image=image_file)
 ```
 
 Here we display *only* the full band images to check for quality.
@@ -283,9 +317,9 @@ for pimax in pi_max_list[1:]: pi_max.append(f'{pimax}')
 pi_min = " ".join(pi_min)
 pi_max = " ".join(pi_max)
 
-efcs = {'mos1' : '1.734 1.746 2.041 0.737 0.145',
-        'mos2' : '0.991 1.387 1.789 0.703 0.150',
-        'pn'   : '9.525 8.121 5.867 1.953 0.578'}
+efcs = {'EMOS1' : '1.734 1.746 2.041 0.737 0.145',
+        'EMOS2' : '0.991 1.387 1.789 0.703 0.150',
+        'EPN'   : '9.525 8.121 5.867 1.953 0.578'}
 
 imagesets = {}
 
@@ -317,8 +351,8 @@ for inst in band_images.keys():
     print(f'ecf         = \'{efcs[inst]}\'\n')
 ```
 
-<div class="alert alert-block alert-warning">
-<b>Warning:</b> The next cell will run <tt>edetect_chain</tt> three times. In total it will take ~2 hours to run.
+<div class="alert alert-block alert-info">
+<b>Note:</b> The next cell will run <tt>edetect_chain</tt> three times. In total it will take ~15 minutes to run.
 </div>
 
 ```python
@@ -402,8 +436,8 @@ print(f'pimax       = \'{all_pi_max}\'')
 print(f'ecf         = \'{all_efcs}\'\n')
 ```
 
-<div class="alert alert-block alert-warning">
-<b>Warning:</b> The next cell will take ~4.5 hours to run.
+<div class="alert alert-block alert-info">
+<b>Note:</b> The next cell will take ~25 minutes to run.
 </div>
 
 ```python
