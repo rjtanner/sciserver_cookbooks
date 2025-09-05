@@ -43,7 +43,7 @@ This tutorial demonstrates several tips, tricks, and special features available 
 When running this notebook inside Sciserver, make sure the HEASARC data drive is mounted when initializing the Sciserver compute container. <a href='https://heasarc.gsfc.nasa.gov/docs/sciserver/'>See details here</a>.
 <br><br>
 <b>Running Outside Sciserver:</b><br>
-This notebook was designed to run on SciServer, but an equivelent notebook can be found on <a href="https://github.com/XMMGOF/pysas">GitHub</a>. You will need to install the development version of pySAS found on GitHub (<a href="https://github.com/XMMGOF/pysas">pySAS on GitHub</a>). There are installation instructions on GitHub and example notebooks can be found inside the directory named 'documentation'.
+This notebook was designed to run on SciServer, but an equivelent notebook <a href="https://github.com/XMMGOF/pysas_docs">can be found on GitHub</a>. You will need to install the development version of pySAS found on GitHub (<a href="https://github.com/XMMGOF/pysas">pySAS on GitHub</a>). There are installation instructions on GitHub. 
 <br>
 </div>
 
@@ -156,6 +156,62 @@ This will return a special obejct that behaves just like a normal Python diction
     <b>Note:</b> This is still experimental. We have tested this, but it is possible to run into some unexpected behavior. We are aware of at least one (!) case with unexpected behavior for an uncommonly used SAS task.
 </div>
 <!-- #endregion -->
+
+## Default pySAS Data Directory Structure
+
+pySAS assumes your XMM data is kept in a single directory `data_dir`. For example,
+```
+data_dir = '/path/to/data_dir/'
+```
+If you are running pySAS on SciServer the path to `data_dir` may be somthing like: `/home/idies/workspace/Temporary/rjtanner/scratch/xmm_data/`. If you are running pySAS on your local machine the path may be something like: `/home/rtanner/xmm_stuff/xmm_data/`.
+
+Once the `data_dir` is set pySAS will download data files for individual Obs IDs into their own directory. With data from multiple Obs IDs your `data_dir` would look like this:
+
+```
+└── data_dir
+    ├── 0104860501
+    ├── 0112200301
+    ├── 0123700101
+    ├── 0400550201
+    ├── 0790830101
+    ├── ...
+```
+
+The directory for each individual Obs ID *can* (but it doesn't *have* to) contain subdirectories for `ODF` and `PPS` files, and a `work` directory. A single Obs ID directory may have subdirectories for just `ODF` files and a `work` directory, or a `PPS` directory and a `work` directory, or all three directories, depending on what level of data files you downloaded. The overall structure might look something like this:
+
+```
+└── data_dir
+    ├── 0104860501
+    │   ├── ODF
+    │   ├── PPS
+    │   └── work
+    ├── 0112200301
+    │   ├── ODF
+    │   └── work
+    ├── 0123700101
+    │   ├── ODF
+    │   └── work
+    ├── 0400550201
+    │   ├── PPS
+    │   └── work
+    ├── 0790830101
+    │   ├── ODF
+    │   ├── PPS
+    │   └── work
+    └── ...
+```
+
+You **should** run SAS tasks inside the `work` directory for the Obs ID you are working with. It is possible to run SAS tasks from **any** directory, but whichever directory you are in when you run a SAS task, that is where SAS will output any new files.
+
+In some cases it is convenient to create a subdirectory within the `work` directory if the SAS tasks you are running will generate a very large number of output files. For example, if you are working with Optical Monitor data the file structure for the Obs ID you are working with may look like this:
+```
+├── 0400550201
+│   ├── ODF
+│   ├── PPS
+│   ├── work
+│   │   └── OM_files
+```
+
 
 ## Run a Task Using the `my_obs` Object
 
